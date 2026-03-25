@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  username  String   @unique
+  avatar    String?
+  eloRating Int      @default(1000)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  gamesAsPlayer1 Game[]        @relation("Player1Games")
+  gamesAsPlayer2 Game[]        @relation("Player2Games")
+  achievements   Achievement[]
+}
+
+model Game {
+  id         String     @id @default(uuid())
+  player1Id  String
+  player2Id  String?
+  gameMode   GameMode
+  status     GameStatus @default(IN_PROGRESS)
+  winnerId   String?
+  player1Elo Int        @default(1000)
+  player2Elo Int        @default(1000)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  player1 User  @relation("Player1Games", fields: [player1Id], references: [id])
+  player2 User? @relation("Player2Games", fields: [player2Id], references: [id])
+}
+
+model Achievement {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  unlockedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+enum GameMode {
+  PVP
+  PVC
+  AI_VS_AI
+  ONLINE
+}
+
+enum GameStatus {
+  IN_PROGRESS
+  COMPLETED
+  DRAW
+  ABANDONED
+}
