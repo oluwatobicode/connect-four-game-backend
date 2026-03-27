@@ -12,6 +12,10 @@ model User {
   email     String   @unique
   username  String   @unique
   avatar    String?
+  isVerified Boolean @default(false)
+  password  String?  //null for those who sign in with google
+  googleId  String? @unique //this is for google unique userid
+  authProvider String? @default("local") // 'google or local'
   eloRating Int      @default(1000)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -19,6 +23,18 @@ model User {
   gamesAsPlayer1 Game[]        @relation("Player1Games")
   gamesAsPlayer2 Game[]        @relation("Player2Games")
   achievements   Achievement[]
+  otps           Otp[]
+}
+
+model Otp {
+  id String @id @default(uuid())
+  otp String
+  userId String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
 }
 
 model Game {
