@@ -26,3 +26,16 @@ export const verifyRefreshToken = (token: string) => {
     userId: string;
   };
 };
+
+// refresh token being added to reset password link
+export const generateResetPasswordToken = (userId: string) => {
+  return jwt.sign({ userId }, process.env.JWT_SECRET!, {
+    expiresIn: "15m",
+  });
+};
+
+export const verifyResetPasswordToken = (token: string) => {
+  return jwt.verify(token, process.env.JWT_SECRET!) as {
+    userId: string;
+  };
+};

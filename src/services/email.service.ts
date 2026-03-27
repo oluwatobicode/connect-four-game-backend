@@ -15,3 +15,21 @@ export const sendOtpEmail = async (email: string, otp: string) => {
     `,
   });
 };
+
+export const sendResetPasswordLinkEmail = async (
+  email: string,
+  resetPasswordToken: string,
+) => {
+  return await resend.emails.send({
+    from: "Oluwatobi <Codingninja@oluwatobii.xyz>",
+    to: email,
+    subject: "Reset password",
+    html: `
+    <div>
+    <h1>Reset password</h1>
+    <p>Click on the link to reset your password</p>
+    <a href="${process.env.FRONTEND_URL}/reset-password/${resetPasswordToken}">Reset password</a>
+    </div>
+    `,
+  });
+};

@@ -37,6 +37,13 @@ model Otp {
   user User @relation(fields: [userId], references: [id])
 }
 
+model BlacklistedToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
 model Game {
   id         String     @id @default(uuid())
   player1Id  String

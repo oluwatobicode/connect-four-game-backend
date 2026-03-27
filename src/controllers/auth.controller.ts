@@ -6,7 +6,9 @@ import {
 import {
   generateAccessToken,
   generateRefreshToken,
+  generateResetPasswordToken,
   verifyRefreshToken,
+  verifyResetPasswordToken,
 } from "../utils/jwt.utils";
 import {
   AUTH,
@@ -19,7 +21,10 @@ import prisma from "../config/prisma";
 import { sendError, sendSuccess } from "../interfaces/ApiResponse";
 import bcrypt from "bcrypt";
 import { otpCode } from "../utils/otp.utils";
-import { sendOtpEmail } from "../services/email.service";
+import {
+  sendOtpEmail,
+  sendResetPasswordLinkEmail,
+} from "../services/email.service";
 
 // signing up locally
 export const signUp = async (
@@ -175,8 +180,20 @@ export const refreshToken = async (
     // 2)validate if refresh token is valid
     const decodedToken = verifyRefreshToken(refreshToken);
 
-    // 3)Fetch user from DB
+    // 3) Check if token is blacklisted
+    const isBlacklisted = await prisma.blacklistedToken.findUnique({
+      where: { token: refreshToken },
+    });
 
+    if (isBlacklisted) {
+      return sendError(
+        res,
+        STATUS_CODE.UNAUTHORIZED,
+        "Token has been revoked",
+      );
+    }
+
+    // 4) Fetch user from DB
     const user = await prisma.user.findUnique({
       where: { id: decodedToken.userId },
     });
@@ -189,7 +206,7 @@ export const refreshToken = async (
       );
     }
 
-    // 4) generate new access token
+    // 5) generate new access token
     const newAccessToken = generateAccessToken(user.id);
 
     return sendSuccess(res, STATUS_CODE.Ok, "Token refreshed successfully", {
@@ -314,32 +331,112 @@ export const verifyOtpWithEmail = async (
   }
 };
 
-export const logout = (req: Request, res: Response, next: NextFunction) => {
+export const sendResetPasswordLink = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
+    const { email } = req.body;
+
+    if (!email) {
+      return sendError(
+        res,
+        STATUS_CODE.BAD_REQUEST,
+        ERROR_MESSAGES.REQUIRED_FIELD("Email"),
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      return sendError(
+        res,
+        STATUS_CODE.UNAUTHORIZED,
+        ERROR_MESSAGES.NOT_FOUND("User"),
+      );
+    }
+
+    const resetPasswordToken = generateResetPasswordToken(user.id);
+
+    await sendResetPasswordLinkEmail(email, resetPasswordToken);
+
+    return sendSuccess(
+      res,
+      STATUS_CODE.Ok,
+      "Reset password link sent successfully",
+    );
   } catch (err) {
     console.log(err);
     next(err);
   }
 };
 
-export const sendResetPasswordLink = (
+export const changePassword = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return sendError(
+        res,
+        STATUS_CODE.BAD_REQUEST,
+        ERROR_MESSAGES.REQUIRED_FIELD("Token and New password"),
+      );
+    }
+
+    const decoded = verifyResetPasswordToken(token);
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(
+      newPassword,
+      AUTH.BCRYPT_SALT_ROUNDS,
+    );
+
+    // Update in DB
+    await prisma.user.update({
+      where: { id: decoded.userId },
+      data: { password: hashedPassword },
+    });
+
+    return sendSuccess(res, STATUS_CODE.Ok, "Password changed successfully");
   } catch (err) {
     console.log(err);
     next(err);
   }
 };
 
-export const changePassword = (
+export const logout = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return sendError(
+        res,
+        STATUS_CODE.BAD_REQUEST,
+        ERROR_MESSAGES.REQUIRED_FIELD("Refresh token"),
+      );
+    }
+
+    const decoded = verifyRefreshToken(refreshToken);
+
+    await prisma.blacklistedToken.create({
+      data: {
+        token: refreshToken,
+        expiresAt: new Date((decoded as any).exp * 1000),
+      },
+    });
+
+    return sendSuccess(res, STATUS_CODE.Ok, SUCCESS_MESSAGES.LOGOUT_SUCCESS);
   } catch (err) {
     console.log(err);
     next(err);
