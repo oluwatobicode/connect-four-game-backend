@@ -18,9 +18,13 @@ import { setupSockets } from "./sockets/index.js";
 import { Server } from "socket.io";
 import http from "http";
 import { socketAuth } from "./middleware/socket.middleware.js";
+import { initCleanupJob } from "./services/gameCleanup.service.js";
 
 const app: Application = express();
 const PORT = process.env.PORT || 5000;
+
+// start-stale-game-cleanup
+initCleanupJob();
 
 // create a http server and pass it to socket.io
 const server = http.createServer(app);

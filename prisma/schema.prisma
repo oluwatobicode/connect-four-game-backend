@@ -54,8 +54,9 @@ model Game {
   winnerId   String?
   player1Elo Int        @default(1000)
   player2Elo Int        @default(1000)
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  lastActiveAt DateTime   @default(now())
 
   player1 User  @relation("Player1Games", fields: [player1Id], references: [id])
   player2 User? @relation("Player2Games", fields: [player2Id], references: [id])

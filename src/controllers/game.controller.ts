@@ -95,7 +95,10 @@ export const joinGameRoom = async (
 
     const updatedGame = await prisma.game.update({
       where: { id: game.id },
-      data: { player2Id: userId },
+      data: {
+        player2Id: userId,
+        lastActiveAt: new Date(),
+      },
     });
 
     // Emit socket event
@@ -129,7 +132,10 @@ export const leaveGameRoom = async (
     // Logic to set status and handle forfeit
     const updatedGame = await prisma.game.update({
       where: { id: gameId as string },
-      data: { status: "FORFEITED" },
+      data: {
+        status: "FORFEITED",
+        lastActiveAt: new Date(),
+      },
     });
 
     // Emit socket event
@@ -185,6 +191,12 @@ export const makeMove = async (
     if (!game) return sendError(res, STATUS_CODE.NOT_FOUND, "Game not found");
 
     // 2. Logic to update board (Simplified for foundation stage)
+
+    // 2.5 Update last active time
+    await prisma.game.update({
+      where: { id: gameId as string },
+      data: { lastActiveAt: new Date() },
+    });
 
     // 3. Emit socket event
     if (req.io) {

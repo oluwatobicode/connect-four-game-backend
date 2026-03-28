@@ -54,10 +54,10 @@ The game supports four modes: local Player vs Player, Player vs CPU (with diffic
 | Leaderboard + ELO Ranking           | ✅ Complete   |
 | Achievements System                 | ✅ Complete   |
 | User Profiles & History             | 📋 Scaffolded |
-| Game Room Management                | 📋 Scaffolded |
+| Game Room Management                | ✅ Complete   |
 | Spectate Mode                       | 📋 Scaffolded |
 | AI vs AI (Claude vs Gemini)         | 📋 Planned    |
-| Online Multiplayer (WebSockets)     | 📋 Planned    |
+| Online Multiplayer (WebSockets)     | 🚀 In Progress|
 
 ---
 
@@ -81,7 +81,7 @@ The game supports four modes: local Player vs Player, Player vs CPU (with diffic
 - **Google OAuth 2.0** — user authentication
 - **Morgan** — HTTP request logging
 - **tsx watch** — hot reload in development
-- **WebSockets (Socket.io)** — real time multiplayer (planned)
+- **WebSockets (Socket.io)** — real-time multiplayer & room events
 
 ### Infrastructure
 
@@ -164,16 +164,18 @@ model User {
 
 ```prisma
 model Game {
-  id         String     @id @default(uuid())
-  player1Id  String
-  player2Id  String?
-  gameMode   GameMode
-  status     GameStatus @default(IN_PROGRESS)
-  winnerId   String?
-  player1Elo Int        @default(1000)
-  player2Elo Int        @default(1000)
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  id           String     @id @default(uuid())
+  roomCode     String     @unique @default(dbgenerated(...))
+  player1Id    String
+  player2Id    String?
+  gameMode     GameMode
+  status       GameStatus @default(IN_PROGRESS)
+  winnerId     String?
+  player1Elo   Int        @default(1000)
+  player2Elo   Int        @default(1000)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  lastActiveAt DateTime   @default(now())
 
   player1 User  @relation("Player1Games", fields: [player1Id], references: [id])
   player2 User? @relation("Player2Games", fields: [player2Id], references: [id])
@@ -257,10 +259,10 @@ enum GameStatus {
 
 | Method | Route                       | Description                                                  |
 | ------ | --------------------------- | ------------------------------------------------------------ |
-| POST   | `/api/v1/game/create`       | Create a new game room (PVP or PVC mode)                     |
-| POST   | `/api/v1/game/join`         | Join an existing game room (for multiplayer)                 |
+| POST   | `/api/v1/game/create`       | Create a new game room (Returns a 6-char `roomCode`)       |
+| POST   | `/api/v1/game/join`         | Join an existing game room via `roomCode`                  |
 | GET    | `/api/v1/game/:id`          | Get the current state of a specific game by ID               |
-| POST   | `/api/v1/game/:id/move`     | Submit a move (column index) for the current player's turn   |
+| POST   | `/api/v1/game/:id/move`     | Submit a move (Emits `move_made` to room via Socket.io)     |
 | POST   | `/api/v1/game/:id/leave`    | Current player leaves or forfeits the game, opponent wins    |
 | POST   | `/api/v1/game/:id/spectate` | Get live game state of an ongoing game to watch in real time |
 | POST   | `/api/v1/game/ai`           | Create a new AI vs AI game session between Claude and Gemini |
@@ -496,9 +498,10 @@ Phase 3 — Achievements
   Achievement unlock triggers after game ends
 
 Phase 4 — WebSocket Foundation
-  Set up Socket.io on the backend
-  Room management (create room, join room, leave room)
-  Basic event system (game:move, game:end, game:state)
+  ✅ Set up Socket.io on the backend
+  ✅ Room management (roomCode generation, join/leave events)
+  ✅ Automated Cleanup Service for stale rooms
+  ✅ Real-time move synchronization
 
 Phase 5 — AI vs AI
   POST /game/ai
