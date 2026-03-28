@@ -92,6 +92,11 @@ export const PAGINATION = {
   MAX_LIMIT: 100,
 };
 
+export const STALE_GAME_CLEANUP = {
+  UNJOINED_TIMEOUT: 30 * 60 * 1000, // 30 minutes
+  INACTIVE_TIMEOUT: 24 * 60 * 60 * 1000, // 24 hours
+};
+
 export const RATE_LIMIT = {
   AI_GAME_COOLDOWN_MS: 60_000,
   MAX_OTP_ATTEMPTS: 5,

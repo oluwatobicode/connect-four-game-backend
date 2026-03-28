@@ -1,21 +1,23 @@
 import cron from "node-cron";
 import prisma from "../config/prisma.js";
+import { STALE_GAME_CLEANUP } from "../config/constants.config.js";
 
-const UNJOINED_TIMEOUT = 30 * 60 * 1000; // 30 minutes
-const INACTIVE_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
-
-/**
- * Deletes stale games from the database.
- * 1. Games with no second player that are older than 30 minutes.
- * 2. Ongoing or forfeited games with no activity for more than 24 hours.
- */
+// Deletes stale games from the database.
+// 1. Games with no second player that are older than 30 minutes.
+// 2. Ongoing or forfeited games with no activity for more than 24 hours.
 export const cleanupStaleGames = async () => {
   try {
     const now = new Date();
-    const unjoinedThreshold = new Date(now.getTime() - UNJOINED_TIMEOUT);
-    const inactiveThreshold = new Date(now.getTime() - INACTIVE_TIMEOUT);
+    const unjoinedThreshold = new Date(
+      now.getTime() - STALE_GAME_CLEANUP.UNJOINED_TIMEOUT,
+    );
+    const inactiveThreshold = new Date(
+      now.getTime() - STALE_GAME_CLEANUP.INACTIVE_TIMEOUT,
+    );
 
-    console.log(`[CleanupService] Starting stale game cleanup at ${now.toISOString()}`);
+    console.log(
+      `[CleanupService] Starting stale game cleanup at ${now.toISOString()}`,
+    );
 
     // Delete unjoined rooms (only player1 present)
     const unjoinedResult = await prisma.game.deleteMany({
@@ -47,18 +49,14 @@ export const cleanupStaleGames = async () => {
   }
 };
 
-/**
- * Initializes the cleanup cron job.
- * Runs every 30 minutes.
- */
+// Initializes the cleanup cron job that runs every 30 minutes.
 export const initCleanupJob = () => {
-  // Run every 30 minutes: '*/30 * * * *'
   cron.schedule("*/30 * * * *", () => {
     cleanupStaleGames();
   });
-  
-  console.log("[CleanupService] Stale game cleanup job scheduled (every 30 mins).");
-  
-  // Also run once on startup
+  console.log(
+    "[CleanupService] Stale game cleanup job scheduled (every 30 mins).",
+  );
+
   cleanupStaleGames();
 };
