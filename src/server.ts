@@ -10,13 +10,44 @@ import {
   leaderboardRoutes,
   userRoutes,
 } from "./routes/index.js";
+import {
+  globalErrorHandler,
+  notFoundHandler,
+} from "./middleware/error.middleware.js";
+import { setupSockets } from "./sockets/index.js";
+import { Server } from "socket.io";
+import http from "http";
+import { socketAuth } from "./middleware/socket.middleware.js";
 
 const app: Application = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
+
+// create a http server and pass it to socket.io
+const server = http.createServer(app);
+
+// Initialize Socket.IO by passing the http server instance
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+  },
+});
+
+io.use(socketAuth);
+
+// Set up socket handlers
+setupSockets(io);
+
+// Attach io to req object
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
 
 app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
+
 
 app.get("/", (req: Request, res: Response) => {
   res.json({
@@ -44,6 +75,9 @@ app.use("/api/v1/profile", userRoutes);
 app.use("/api/v1/leaderboard", leaderboardRoutes);
 app.use("/api/v1/game", gameRoutes);
 
-app.listen(PORT, () => {
+app.use(notFoundHandler);
+app.use(globalErrorHandler);
+
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

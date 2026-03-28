@@ -40,24 +40,24 @@ The game supports four modes: local Player vs Player, Player vs CPU (with diffic
 
 ## Features
 
-| Feature                             | Status         |
-| ----------------------------------- | -------------- |
-| Local PVP                           | ✅ Complete    |
-| Player vs CPU (4 difficulty levels) | ✅ Complete    |
-| Google OAuth Authentication         | ✅ Complete    |
-| JWT + Refresh Token                 | ✅ Complete    |
-| OTP Authentication                  | ✅ Complete    |
-| Password Reset & Change             | ✅ Complete    |
-| Local Signup + Login                | ✅ Complete    |
-| Secure Logout (Token Blacklist)     | ✅ Complete    |
-| Auth Middleware (Protect Routes)    | ✅ Complete    |
-| Leaderboard + ELO Ranking           | 📋 Scaffolded  |
-| Achievements System                 | 📋 Scaffolded  |
-| User Profiles & History             | 📋 Scaffolded  |
-| Game Room Management                | 📋 Scaffolded  |
-| AI vs AI (Claude vs Gemini)         | 📋 Planned     |
-| Online Multiplayer (WebSockets)     | 📋 Planned     |
-| Spectate Mode                       | 📋 Scaffolded  |
+| Feature                             | Status        |
+| ----------------------------------- | ------------- |
+| Local PVP                           | ✅ Complete   |
+| Player vs CPU (4 difficulty levels) | ✅ Complete   |
+| Google OAuth Authentication         | ✅ Complete   |
+| JWT + Refresh Token                 | ✅ Complete   |
+| OTP Authentication                  | ✅ Complete   |
+| Password Reset & Change             | ✅ Complete   |
+| Local Signup + Login                | ✅ Complete   |
+| Secure Logout (Token Blacklist)     | ✅ Complete   |
+| Auth Middleware (Protect Routes)    | ✅ Complete   |
+| Leaderboard + ELO Ranking           | ✅ Complete   |
+| Achievements System                 | ✅ Complete   |
+| User Profiles & History             | 📋 Scaffolded |
+| Game Room Management                | 📋 Scaffolded |
+| Spectate Mode                       | 📋 Scaffolded |
+| AI vs AI (Claude vs Gemini)         | 📋 Planned    |
+| Online Multiplayer (WebSockets)     | 📋 Planned    |
 
 ---
 

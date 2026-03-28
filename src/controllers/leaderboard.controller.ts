@@ -38,8 +38,6 @@ export const getMyRanking = async (
   next: NextFunction,
 ) => {
   try {
-    // const { userId } = req.user;
-
     const myRanking = await prisma.user.findUnique({
       where: { id: req.user },
       select: {
@@ -60,10 +58,9 @@ export const getMyRanking = async (
       where: { eloRating: { gt: myRanking.eloRating } },
     });
 
-    return res.status(STATUS_CODE.Ok).json({
-      success: true,
-      message: "Fetched successfully",
-      data: { ...myRanking, rank: rank + 1 },
+    return sendSuccess(res, STATUS_CODE.Ok, "Fetched successfully", {
+      ...myRanking,
+      rank: rank + 1,
     });
   } catch (error) {
     console.log(error);

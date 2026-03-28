@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { achievementsController } from "../controllers";
+import { protect } from "../middleware/protected.middleware";
 
 const router = Router();
 
-router.get("/achievements", achievementsController.getAllAchievements);
-router.get("/achievements/me", achievementsController.getMyAchievements);
-router.get("/achievements/:userId", achievementsController.getAUserAchievement);
+router.get("/", protect, achievementsController.getAllAchievements);
+router.get("/me", protect, achievementsController.getMyAchievements);
+router.get("/:userId", protect, achievementsController.getAUserAchievement);
 
 export default router;

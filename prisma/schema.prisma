@@ -46,6 +46,7 @@ model BlacklistedToken {
 
 model Game {
   id         String     @id @default(uuid())
+  roomCode   String     @unique @default(dbgenerated("upper(substring(gen_random_uuid()::text from 1 for 6))"))
   player1Id  String
   player2Id  String?
   gameMode   GameMode
@@ -81,4 +82,5 @@ enum GameStatus {
   COMPLETED
   DRAW
   ABANDONED
+  FORFEITED
 }
