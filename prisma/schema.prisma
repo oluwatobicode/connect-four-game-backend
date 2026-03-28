@@ -49,6 +49,9 @@ model Game {
   roomCode   String     @unique @default(dbgenerated("upper(substring(gen_random_uuid()::text from 1 for 6))"))
   player1Id  String
   player2Id  String?
+  boardState Json @default("[]")  // stores the grid array
+  currentTurn String @default("player1") // whose turn it is
+  totalMoves  Int    @default(0)  // needed for Speed Demon achievement
   gameMode   GameMode
   status     GameStatus @default(IN_PROGRESS)
   winnerId   String?
