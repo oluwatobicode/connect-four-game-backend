@@ -1,14 +1,6 @@
 import prisma from "../config/prisma";
 import { ACHIEVEMENTS } from "../config/achievements.config";
-
-interface GameResult {
-  winnerId: string | null;
-  loserId: string | null;
-  isDraw: boolean;
-  totalMoves: number;
-  winnerElo: number;
-  loserElo: number;
-}
+import { GameResult } from "../types/GameResult";
 
 // Check and unlock achievements after a game ends
 export const checkAchievements = async (

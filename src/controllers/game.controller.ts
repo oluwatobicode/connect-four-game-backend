@@ -1,8 +1,9 @@
 import { NextFunction, Request, Response } from "express";
 import prisma from "../config/prisma.js";
-import { STATUS_CODE, ERROR_MESSAGES } from "../config/constants.config.js";
+import { STATUS_CODE, ERROR_MESSAGES, GAME } from "../config/constants.config.js";
 import { sendSuccess, sendError } from "../interfaces/ApiResponse.js";
-import { createInitialBoard } from "../utils/game.utils.js";
+import { createInitialBoard, checkLowestRow, checkWin } from "../utils/game.utils.js";
+import { calculateNewElo } from "../utils/elo.utils.js";
 
 
 // Create a new game session, either PVP or vs CPU
@@ -192,15 +193,84 @@ export const makeMove = async (
     // 1. Fetch game and validate move
     const game = await prisma.game.findUnique({
       where: { id: gameId as string },
+      include: {
+        player1: true,
+        player2: true,
+      }
     });
+    
     if (!game) return sendError(res, STATUS_CODE.NOT_FOUND, "Game not found");
+    if (game.status !== "IN_PROGRESS") return sendError(res, STATUS_CODE.BAD_REQUEST, ERROR_MESSAGES.GAME_ALREADY_ENDED);
+    if (game.currentTurn !== userId) return sendError(res, STATUS_CODE.FORBIDDEN, ERROR_MESSAGES.NOT_YOUR_TURN);
 
-    // 2. Logic to update board (Simplified for foundation stage)
+    // 2. Logic to update board
+    const board = game.boardState as number[][];
+    const playerType = game.player1Id === userId ? "player1" : "player2";
+    const playerNum =  playerType === "player1" ? 1 : 2;
 
-    // 2.5 Update last active time
-    await prisma.game.update({
+    const row = checkLowestRow(board, column);
+    if (row === -1) return sendError(res, STATUS_CODE.BAD_REQUEST, ERROR_MESSAGES.COLUMN_FULL);
+
+    // Drop the disc
+    board[column][row] = playerNum;
+    const isWin = checkWin(board, column, row, playerType);
+    
+    // Determine next turn or game over state
+    let nextTurn = game.currentTurn === game.player1Id ? game.player2Id : game.player1Id;
+    let newStatus = game.status as "IN_PROGRESS" | "COMPLETED" | "DRAW" | "FORFEITED" | "ABANDONED";
+    let winnerId = null;
+
+    if (isWin) {
+      newStatus = "COMPLETED";
+      winnerId = userId;
+    } else if (game.totalMoves + 1 >= GAME.BOARD_COLS * GAME.BOARD_ROWS) {
+      newStatus = "DRAW"; // Board is full
+    }
+
+    // --- ELO Calculation ---
+    let p1NewElo = game.player1.eloRating;
+    let p2NewElo = game.player2 ? game.player2.eloRating : 1000;
+
+    if (newStatus === "COMPLETED" || newStatus === "DRAW") {
+      let result: "player1_win" | "player2_win" | "draw" = "draw";
+      if (newStatus === "COMPLETED") {
+        result = winnerId === game.player1Id ? "player1_win" : "player2_win";
+      }
+
+      const eloUpdate = calculateNewElo(p1NewElo, p2NewElo, result);
+      p1NewElo = eloUpdate.newRatingA;
+      p2NewElo = eloUpdate.newRatingB;
+
+      // Update the actual User profiles
+      await prisma.$transaction([
+        prisma.user.update({
+          where: { id: game.player1Id },
+          data: { eloRating: p1NewElo },
+        }),
+        ...(game.player2Id
+          ? [
+              prisma.user.update({
+                where: { id: game.player2Id },
+                data: { eloRating: p2NewElo },
+              }),
+            ]
+          : []),
+      ]);
+    }
+
+    // Save everything back to DB
+    const updatedGame = await prisma.game.update({
       where: { id: gameId as string },
-      data: { lastActiveAt: new Date() },
+      data: { 
+        boardState: board,
+        currentTurn: nextTurn as string,
+        totalMoves: { increment: 1 },
+        status: newStatus,
+        winnerId: winnerId,
+        lastActiveAt: new Date(),
+        player1Elo: p1NewElo, // Saves snapshot of final ELO to game history
+        player2Elo: p2NewElo
+      },
     });
 
     // 3. Emit socket event
@@ -208,10 +278,14 @@ export const makeMove = async (
       req.io.to(gameId as string).emit("move_made", {
         playerId: userId,
         column,
+        row,
+        board,
+        isWin,
+        newStatus
       });
     }
 
-    return sendSuccess(res, STATUS_CODE.Ok, "Move recorded", { column });
+    return sendSuccess(res, STATUS_CODE.Ok, "Move recorded", updatedGame);
   } catch (error) {
     console.log(error);
     next(error);

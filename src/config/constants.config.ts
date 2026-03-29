@@ -100,6 +100,7 @@ export const STALE_GAME_CLEANUP = {
 export const RATE_LIMIT = {
   AI_GAME_COOLDOWN_MS: 60_000,
   MAX_OTP_ATTEMPTS: 5,
+  MAX_REQUEST_LIMIT: 5,
 };
 
 export const API_VERSION = "v1";

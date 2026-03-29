@@ -1,98 +1,49 @@
-/*
+import { ELO } from "../config/constants.config.js";
 
-ratingChange = k * (actualResult - expectedResult)
+/**
+ * Calculates new ELO ratings for two players after a match.
+ * @param ratingA Player A's current ELO
+ * @param ratingB Player B's current ELO
+ * @param result "player1_win" | "player2_win" | "draw"
+ * @returns { newRatingA: number, newRatingB: number }
+ */
 
-what is k? 
+export const calculateNewElo = (
+  ratingA: number,
+  ratingB: number,
+  result: "player1_win" | "player2_win" | "draw",
+) => {
+  // 1. Calculate Expected Scores (Probability of winning)
+  // Formula: 1 / (1 + 10^((OpponentRating - MyRating) / 400))
+  const expectedScoreA = 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
+  const expectedScoreB = 1 / (1 + Math.pow(10, (ratingA - ratingB) / 400));
 
-The Elo rating K-factor is a constant determining the maximum rating
-points a player can gain or lose in a single match (The K-factor is the maximum number
-of points you can gain or lose in one sitting.)
+  // 2. Determine Actual Scores based on outcome (1 for win, 0.5 for draw, 0 for loss)
+  let actualScoreA = 0;
+  let actualScoreB = 0;
 
-NB 1-> HIGH-K FACTOR ARE ASSIGNED TO NEW PLAYERS
-e.g K-factor = 40 -> If they win their first game, their score jumps up by 40 points.
+  if (result === "player1_win") {
+    actualScoreA = 1;
+    actualScoreB = 0;
+  } else if (result === "player2_win") {
+    actualScoreA = 0;
+    actualScoreB = 1;
+  } else if (result === "draw") {
+    actualScoreA = 0.5;
+    actualScoreB = 0.5;
+  }
 
-NB 2-> LOW K-FACTOR ARE ASSIGNED TO OLD PLAYERS THAT HAVE BEEN PLAYING FOR A WHILE
-K-factor = 10 -> If they lose one game because they got distracted, their score only drops by 10 points.
+  // 3. Calculate New Ratings using the K-Factor
+  // Formula: OldRating + K * (ActualScore - ExpectedScore)
+  const newRatingA = Math.max(
+    ELO.MIN_RATING,
+    Math.round(ratingA + ELO.K_FACTOR * (actualScoreA - expectedScoreA)),
+  );
 
-what is ActualResult?
+  const newRatingB = Math.max(
+    ELO.MIN_RATING,
+    Math.round(ratingB + ELO.K_FACTOR * (actualScoreB - expectedScoreB)),
+  );
 
-1. Actual Result -> This is the simple truth of how the game ended
-(
-Win = 1
-Draw = 0.5
-Loss = 0
-)
-
-2) expected result -> This is a prediction made before the game starts, based on the players' current ratings. 
-It represents the probability of a player winning, expressed as a number between 0 and 1
-
-If ratings are equal: The expected result for both is 0.5 (a 50% chance of winning).
-If you are much stronger: Your expected result might be 0.9 (a 90% chance of winning).
-If you are much weaker: Your expected result might be 0.1 (a 10% chance of winning)
-
-to calculate the expectedResult
-expectedResult = (1 / (1 + 10^((ratingB - ratingA) / 400)))
-
-*/
-// CASES TO BUILD
-// If a Pro (high rating) loses to a Noob (low rating), that is a big surprise. (RatingChange = K * (ActualResult - ExpectedResult))
-
-// this is to calculate the expectedResult
-
-import { ELO } from "../config/constants.config";
-
-const calculateExpectedResult = (ratingA: number, ratingB: number) => {
-  return 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
+  return { newRatingA, newRatingB };
 };
-
-export function eloRatingSystem(
-  k: number = ELO.K_FACTOR,
-  playerRating: number,
-  opponentRating: number,
-
-  gameState: "WIN" | "LOSS" | "DRAW",
-) {
-  const actualResult = gameState === "WIN" ? 1 : gameState === "DRAW" ? 0.5 : 0;
-
-  const expectedResult = calculateExpectedResult(playerRating, opponentRating);
-
-  const ratingChange = Math.round(k * (actualResult - expectedResult));
-
-  const newRating = Math.max(playerRating + ratingChange, 100);
-
-  return { ratingChange, newRating };
-}
-
-export function updateBothRating(
-  player1Rating: number,
-  player2Rating: number,
-  result: "PLAYER1_WIN" | "PLAYER2_WIN" | "DRAW",
-) {
-  const p1State =
-    result === "PLAYER1_WIN"
-      ? "WIN"
-      : result === "PLAYER2_WIN"
-        ? "LOSS"
-        : "DRAW";
-  const p2State =
-    result === "PLAYER2_WIN"
-      ? "WIN"
-      : result === "PLAYER1_WIN"
-        ? "LOSS"
-        : "DRAW";
-
-  const p1 = eloRatingSystem(
-    ELO.K_FACTOR,
-    player1Rating,
-    player2Rating,
-    p1State,
-  );
-  const p2 = eloRatingSystem(
-    ELO.K_FACTOR,
-    player2Rating,
-    player1Rating,
-    p2State,
-  );
-
-  return { p1, p2 };
-}
