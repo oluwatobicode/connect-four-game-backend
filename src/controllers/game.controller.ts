@@ -2,6 +2,8 @@ import { NextFunction, Request, Response } from "express";
 import prisma from "../config/prisma.js";
 import { STATUS_CODE, ERROR_MESSAGES } from "../config/constants.config.js";
 import { sendSuccess, sendError } from "../interfaces/ApiResponse.js";
+import { createInitialBoard } from "../utils/game.utils.js";
+
 
 // Create a new game session, either PVP or vs CPU
 export const createGameRoom = async (
@@ -26,8 +28,11 @@ export const createGameRoom = async (
         player1Id: userId as string,
         gameMode,
         status: "IN_PROGRESS",
+        boardState: createInitialBoard(),
+        currentTurn: userId as string, // Player 1 starts the game
       },
     });
+
 
     return sendSuccess(
       res,
