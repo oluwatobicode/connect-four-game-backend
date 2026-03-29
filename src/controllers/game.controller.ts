@@ -4,6 +4,8 @@ import { STATUS_CODE, ERROR_MESSAGES, GAME } from "../config/constants.config.js
 import { sendSuccess, sendError } from "../interfaces/ApiResponse.js";
 import { createInitialBoard, checkLowestRow, checkWin } from "../utils/game.utils.js";
 import { calculateNewElo } from "../utils/elo.utils.js";
+import { getBestMove } from "../utils/minmax.utils.js";
+import { checkMatchAchievements } from "../utils/achievements.utils.js";
 
 
 // Create a new game session, either PVP or vs CPU
@@ -215,8 +217,8 @@ export const makeMove = async (
     board[column][row] = playerNum;
     const isWin = checkWin(board, column, row, playerType);
     
-    // Determine next turn or game over state
-    let nextTurn = game.currentTurn === game.player1Id ? game.player2Id : game.player1Id;
+    // Determine next turn or game over state. If player2Id is missing in PVE, it's the CPU!
+    let nextTurn = game.currentTurn === game.player1Id ? (game.player2Id || "CPU") : game.player1Id;
     let newStatus = game.status as "IN_PROGRESS" | "COMPLETED" | "DRAW" | "FORFEITED" | "ABANDONED";
     let winnerId = null;
 
@@ -273,6 +275,11 @@ export const makeMove = async (
       },
     });
 
+    // 2.5 Trigger Achievements (Asynchronous)
+    if (newStatus === "COMPLETED" || newStatus === "DRAW") {
+      checkMatchAchievements(game.id).catch(console.error);
+    }
+
     // 3. Emit socket event
     if (req.io) {
       req.io.to(gameId as string).emit("move_made", {
@@ -285,12 +292,79 @@ export const makeMove = async (
       });
     }
 
+    // 4. TRIGGER AI MOVE IF NEEDED
+    // If the mode is PVC (Player vs CPU), and it's suddenly the CPU's turn, calculate their move asynchronously!
+    if (game.gameMode === "PVC" && nextTurn === "CPU" && newStatus === "IN_PROGRESS") {
+      setTimeout(() => triggerCpuMove(game.id, req.io), 1000); // Wait 1 sec to feel "human"
+    }
+
     return sendSuccess(res, STATUS_CODE.Ok, "Move recorded", updatedGame);
   } catch (error) {
     console.log(error);
     next(error);
   }
 };
+
+// Helper function for the CPU to think and play
+async function triggerCpuMove(gameId: string, io: any) {
+  try {
+    const game = await prisma.game.findUnique({ where: { id: gameId } });
+    if (!game || game.status !== "IN_PROGRESS" || game.currentTurn !== "CPU") return;
+
+    // 1. Ask the Minimax AI for the best column
+    const board = game.boardState as number[][];
+    const cpuCol = getBestMove(board, 4); // Depth 4 is a medium-hard difficulty
+    const cpuRow = checkLowestRow(board, cpuCol);
+    
+    if (cpuRow === -1) return; // Should never happen with AI
+
+    // 2. Drop the AI's piece
+    board[cpuCol][cpuRow] = 2; // CPU is always considered Player 2 (🟡)
+    const isWin = checkWin(board, cpuCol, cpuRow, "player2");
+
+    let newStatus = game.status as "IN_PROGRESS" | "COMPLETED" | "DRAW" | "FORFEITED" | "ABANDONED";
+    let winnerId = null;
+
+    if (isWin) {
+      newStatus = "COMPLETED";
+      winnerId = "CPU"; // The system beat the human!
+    } else if (game.totalMoves + 1 >= GAME.BOARD_COLS * GAME.BOARD_ROWS) {
+      newStatus = "DRAW" as any;
+    }
+
+    // 3. Save the move to the DB
+    const updatedGame = await prisma.game.update({
+      where: { id: gameId },
+      data: {
+        boardState: board,
+        currentTurn: game.player1Id, // Passes the turn back to the Human!
+        status: newStatus as any,
+        winnerId: winnerId,
+        totalMoves: { increment: 1 },
+        lastActiveAt: new Date()
+      }
+    });
+
+    // 3.5 Trigger Achievements for the Human if the CPU magically caused a Draw
+    if (newStatus === "COMPLETED" || newStatus === "DRAW") {
+      checkMatchAchievements(game.id).catch(console.error);
+    }
+
+    // 4. Broadcast the CPU's move to the frontend
+    if (io) {
+      io.to(gameId).emit("move_made", {
+        playerId: "CPU",
+        column: cpuCol,
+        row: cpuRow,
+        board,
+        isWin,
+        newStatus
+      });
+    }
+  } catch (error) {
+    console.error("Failed to execute CPU Move:", error);
+  }
+}
 
 //Create a new AI vs AI game session between Claude and Gemini
 export const createAiGameRoom = async (
@@ -305,3 +379,4 @@ export const createAiGameRoom = async (
     next(error);
   }
 };
+

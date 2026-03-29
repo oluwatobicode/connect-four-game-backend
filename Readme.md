@@ -40,24 +40,24 @@ The game supports four modes: local Player vs Player, Player vs CPU (with diffic
 
 ## Features
 
-| Feature                             | Status        |
-| ----------------------------------- | ------------- |
-| Local PVP                           | ✅ Complete   |
-| Player vs CPU (4 difficulty levels) | ✅ Complete   |
-| Google OAuth Authentication         | ✅ Complete   |
-| JWT + Refresh Token                 | ✅ Complete   |
-| OTP Authentication                  | ✅ Complete   |
-| Password Reset & Change             | ✅ Complete   |
-| Local Signup + Login                | ✅ Complete   |
-| Secure Logout (Token Blacklist)     | ✅ Complete   |
-| Auth Middleware (Protect Routes)    | ✅ Complete   |
-| Leaderboard + ELO Ranking           | ✅ Complete   |
-| Achievements System                 | ✅ Complete   |
-| User Profiles & History             | 📋 Scaffolded |
-| Game Room Management                | ✅ Complete   |
-| Spectate Mode                       | 📋 Scaffolded |
-| AI vs AI (Claude vs Gemini)         | 📋 Planned    |
-| Online Multiplayer (WebSockets)     | 🚀 In Progress|
+| Feature                             | Status         |
+| ----------------------------------- | -------------- |
+| Local PVP                           | ✅ Complete    |
+| Player vs CPU (4 difficulty levels) | ✅ Complete    |
+| Google OAuth Authentication         | ✅ Complete    |
+| JWT + Refresh Token                 | ✅ Complete    |
+| OTP Authentication                  | ✅ Complete    |
+| Password Reset & Change             | ✅ Complete    |
+| Local Signup + Login                | ✅ Complete    |
+| Secure Logout (Token Blacklist)     | ✅ Complete    |
+| Auth Middleware (Protect Routes)    | ✅ Complete    |
+| Leaderboard + ELO Ranking           | ✅ Complete    |
+| Achievements System                 | ✅ Complete    |
+| User Profiles & History             | 📋 Scaffolded  |
+| Game Room Management                | ✅ Complete    |
+| Spectate Mode                       | 📋 Scaffolded  |
+| AI vs AI (Claude vs Gemini)         | 📋 Planned     |
+| Online Multiplayer (WebSockets)     | 🚀 In Progress |
 
 ---
 
@@ -259,10 +259,10 @@ enum GameStatus {
 
 | Method | Route                       | Description                                                  |
 | ------ | --------------------------- | ------------------------------------------------------------ |
-| POST   | `/api/v1/game/create`       | Create a new game room (Returns a 6-char `roomCode`)       |
-| POST   | `/api/v1/game/join`         | Join an existing game room via `roomCode`                  |
+| POST   | `/api/v1/game/create`       | Create a new game room (Returns a 6-char `roomCode`)         |
+| POST   | `/api/v1/game/join`         | Join an existing game room via `roomCode`                    |
 | GET    | `/api/v1/game/:id`          | Get the current state of a specific game by ID               |
-| POST   | `/api/v1/game/:id/move`     | Submit a move (Emits `move_made` to room via Socket.io)     |
+| POST   | `/api/v1/game/:id/move`     | Submit a move (Emits `move_made` to room via Socket.io)      |
 | POST   | `/api/v1/game/:id/leave`    | Current player leaves or forfeits the game, opponent wins    |
 | POST   | `/api/v1/game/:id/spectate` | Get live game state of an ongoing game to watch in real time |
 | POST   | `/api/v1/game/ai`           | Create a new AI vs AI game session between Claude and Gemini |
@@ -482,19 +482,19 @@ npx prisma generate
 
 ```
 Phase 1 — Auth
-  POST /auth/google
-  POST /auth/logout
-  POST /auth/refresh-token
-  Middleware: protect all routes that need a logged in user
+  ✅POST /auth/google
+  ✅POST /auth/logout
+  ✅POST /auth/refresh-token
+ ✅ Middleware: protect all routes that need a logged in user
 
 Phase 2 — Leaderboard + ELO
-  GET /leaderboard
-  GET /leaderboard/me
-  ELO calculation logic after each game
+  ✅GET /leaderboard
+  ✅GET /leaderboard/me
+  ✅ELO calculation logic after each game
 
 Phase 3 — Achievements
-  GET /achievements
-  GET /achievements/me
+  ✅GET /achievements
+ ✅ GET /achievements/me
   Achievement unlock triggers after game ends
 
 Phase 4 — WebSocket Foundation
@@ -510,9 +510,9 @@ Phase 5 — AI vs AI
   Stream moves to frontend via WebSockets
 
 Phase 6 — Online Multiplayer
-  POST /game/create (online mode)
-  Matchmaking
-  Real time move sync via WebSockets
+  ✅POST /game/create (online mode)
+  ✅Matchmaking
+  ✅Real time move sync via WebSockets
   Disconnection and reconnection handling
 
 Phase 7 — Spectate Mode

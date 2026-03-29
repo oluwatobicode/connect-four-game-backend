@@ -6,3 +6,7 @@ export interface GameResult {
   winnerElo: number;
   loserElo: number;
 }
+
+export interface GameBoard {
+  grid: number[][];
+}
