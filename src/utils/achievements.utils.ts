@@ -15,7 +15,8 @@ export async function checkMatchAchievements(gameId: string) {
       },
     });
 
-    if (!game || (game.status !== "COMPLETED" && game.status !== "DRAW")) return;
+    if (!game || (game.status !== "COMPLETED" && game.status !== "DRAW"))
+      return;
 
     // Build the list of humans to check (Don't check achievements for the CPU!)
     const humanPlayers = [game.player1Id];
@@ -28,8 +29,14 @@ export async function checkMatchAchievements(gameId: string) {
       const newlyUnlocked: string[] = [];
 
       // Determine user's match stats
-      const userElo = userId === game.player1Id ? game.player1.eloRating : game.player2?.eloRating;
-      const opponentElo = userId === game.player1Id ? game.player2?.eloRating : game.player1.eloRating;
+      const userElo =
+        userId === game.player1Id
+          ? game.player1.eloRating
+          : game.player2?.eloRating;
+      const opponentElo =
+        userId === game.player1Id
+          ? game.player2?.eloRating
+          : game.player1.eloRating;
       const isWinner = game.winnerId === userId;
       const isDraw = game.status === "DRAW";
 
@@ -45,7 +52,11 @@ export async function checkMatchAchievements(gameId: string) {
         newlyUnlocked.push("first_draw");
       }
 
-      if (isWinner && game.totalMoves < 20 && !unlockedTypes.has("win_under_20")) {
+      if (
+        isWinner &&
+        game.totalMoves < 20 &&
+        !unlockedTypes.has("win_under_20")
+      ) {
         newlyUnlocked.push("win_under_20");
       }
 
@@ -57,14 +68,19 @@ export async function checkMatchAchievements(gameId: string) {
         newlyUnlocked.push("reach_1500");
       }
 
-      if (isWinner && opponentElo && opponentElo - userElo! >= 200 && !unlockedTypes.has("beat_higher_elo")) {
+      if (
+        isWinner &&
+        opponentElo &&
+        opponentElo - userElo! >= 200 &&
+        !unlockedTypes.has("beat_higher_elo")
+      ) {
         newlyUnlocked.push("beat_higher_elo");
       }
 
       // NOTE: "play_10_games" and "win_streak_3" would require a slightly deeper DB query
       // (counting total Games or checking recent Game history). Skipping for Phase 5 to keep it lightweight.
 
-      // -------------------------------------------------------------
+      // ------------------------------------------------------------o
       // SAVE TO DATABASE
       // -------------------------------------------------------------
       if (newlyUnlocked.length > 0) {

@@ -1,11 +1,13 @@
 import { Router } from "express";
 import { userController } from "../controllers";
 
+import { protect } from "../middleware/protected.middleware.js";
+
 const router = Router();
 
-router.get("/", userController.getProfile);
-router.put("/", userController.updateProfile);
-router.delete("/", userController.deleteProfile);
+router.get("/", protect, userController.getProfile);
+router.put("/", protect, userController.updateProfile);
+router.delete("/", protect, userController.deleteProfile);
 router.get("/:userId", userController.getAUserProfile);
 router.get("/:userId/game-history", userController.getAUserGameHistory);
 

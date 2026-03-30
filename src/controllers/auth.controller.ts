@@ -95,6 +95,12 @@ export const login = async (
 
     const user = await prisma.user.findUnique({
       where: { email },
+      omit: {
+        isVerified: true,
+        authProvider: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
     if (!user) {
@@ -186,11 +192,7 @@ export const refreshToken = async (
     });
 
     if (isBlacklisted) {
-      return sendError(
-        res,
-        STATUS_CODE.UNAUTHORIZED,
-        "Token has been revoked",
-      );
+      return sendError(res, STATUS_CODE.UNAUTHORIZED, "Token has been revoked");
     }
 
     // 4) Fetch user from DB

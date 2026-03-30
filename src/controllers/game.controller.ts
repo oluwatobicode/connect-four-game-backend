@@ -1,12 +1,20 @@
 import { NextFunction, Request, Response } from "express";
 import prisma from "../config/prisma.js";
-import { STATUS_CODE, ERROR_MESSAGES, GAME } from "../config/constants.config.js";
+import {
+  STATUS_CODE,
+  ERROR_MESSAGES,
+  GAME,
+} from "../config/constants.config.js";
 import { sendSuccess, sendError } from "../interfaces/ApiResponse.js";
-import { createInitialBoard, checkLowestRow, checkWin } from "../utils/game.utils.js";
+import {
+  createInitialBoard,
+  checkLowestRow,
+  checkWin,
+} from "../utils/game.utils.js";
 import { calculateNewElo } from "../utils/elo.utils.js";
 import { getBestMove } from "../utils/minmax.utils.js";
 import { checkMatchAchievements } from "../utils/achievements.utils.js";
-
+import { clearTurnTimer, startTurnTimer } from "../services/timer.service.js";
 
 // Create a new game session, either PVP or vs CPU
 export const createGameRoom = async (
@@ -35,7 +43,6 @@ export const createGameRoom = async (
         currentTurn: userId as string, // Player 1 starts the game
       },
     });
-
 
     return sendSuccess(
       res,
@@ -88,6 +95,9 @@ export const joinGameRoom = async (
     });
     if (!game) return sendError(res, STATUS_CODE.NOT_FOUND, "Game not found");
 
+    if (game.status !== "IN_PROGRESS") {
+      return sendError(res, STATUS_CODE.BAD_REQUEST, "Game is not joinable");
+    }
 
     if (game.player1Id === userId) {
       return sendError(
@@ -109,11 +119,10 @@ export const joinGameRoom = async (
       },
     });
 
-    // Emit socket event
+    // this is for emitting a socket event for when a player joins
     if (req.io) {
       req.io.to(game.id).emit("player_joined", { userId });
     }
-
 
     return sendSuccess(res, STATUS_CODE.Ok, "Joined room", updatedGame);
   } catch (error) {
@@ -122,7 +131,7 @@ export const joinGameRoom = async (
   }
 };
 
-// Current player forfeits the game, opponent wins
+// if a player forfeits the game, the opponent wins
 export const leaveGameRoom = async (
   req: Request,
   res: Response,
@@ -137,16 +146,17 @@ export const leaveGameRoom = async (
     });
     if (!game) return sendError(res, STATUS_CODE.NOT_FOUND, "Game not found");
 
-    // Logic to set status and handle forfeit
+    //  set the status to forfeited and handle forfeit
     const updatedGame = await prisma.game.update({
       where: { id: gameId as string },
       data: {
         status: "FORFEITED",
+        winnerId: userId === game.player1Id ? game.player2Id : game.player1Id,
         lastActiveAt: new Date(),
       },
     });
 
-    // Emit socket event
+    // this is for emitting a socket event for when a player leaves
     if (req.io) {
       req.io.to(gameId as string).emit("player_left", { userId });
     }
@@ -158,22 +168,41 @@ export const leaveGameRoom = async (
   }
 };
 
-// Get live game state of an ongoing game to watch in real time
+// this is to get a live game state of an ongoing game via a room code to watch in real time
 export const spectateGame = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const { id: gameId } = req.params;
-    return sendSuccess(res, STATUS_CODE.Ok, "Spectating game", { gameId });
+    const { roomCode } = req.body;
+
+    if (!roomCode) {
+      return sendError(res, STATUS_CODE.BAD_REQUEST, "Room code is required to spectate");
+    }
+
+    const game = await prisma.game.findUnique({
+      where: { roomCode: roomCode.toUpperCase() },
+      include: {
+        player1: { select: { id: true, username: true, avatar: true } },
+        player2: { select: { id: true, username: true, avatar: true } },
+      },
+    });
+
+    if (!game) return sendError(res, STATUS_CODE.NOT_FOUND, "Game not found");
+
+    // The frontend can now use this 'role' field to hide the player controls!
+    return sendSuccess(res, STATUS_CODE.Ok, "Spectating game", { 
+      ...game, 
+      role: "SPECTATOR" 
+    });
   } catch (error) {
     console.log(error);
     next(error);
   }
 };
 
-// Submit a move (column index) for the current player's turn
+// this is to submit a move (column index) for the current player's turn
 export const makeMove = async (
   req: Request,
   res: Response,
@@ -183,6 +212,9 @@ export const makeMove = async (
     const { id: gameId } = req.params;
     const { column } = req.body;
     const userId = req.user as string;
+
+    // 0. Instantly pause the 30-second clock so they don't forfeit while the server calculates
+    clearTurnTimer(gameId as string);
 
     if (column === undefined) {
       return sendError(
@@ -198,38 +230,63 @@ export const makeMove = async (
       include: {
         player1: true,
         player2: true,
-      }
+      },
     });
-    
+
     if (!game) return sendError(res, STATUS_CODE.NOT_FOUND, "Game not found");
-    if (game.status !== "IN_PROGRESS") return sendError(res, STATUS_CODE.BAD_REQUEST, ERROR_MESSAGES.GAME_ALREADY_ENDED);
-    if (game.currentTurn !== userId) return sendError(res, STATUS_CODE.FORBIDDEN, ERROR_MESSAGES.NOT_YOUR_TURN);
+    if (game.status !== "IN_PROGRESS")
+      return sendError(
+        res,
+        STATUS_CODE.BAD_REQUEST,
+        ERROR_MESSAGES.GAME_ALREADY_ENDED,
+      );
+    if (game.currentTurn !== userId)
+      return sendError(
+        res,
+        STATUS_CODE.FORBIDDEN,
+        ERROR_MESSAGES.NOT_YOUR_TURN,
+      );
 
     // 2. Logic to update board
     const board = game.boardState as number[][];
     const playerType = game.player1Id === userId ? "player1" : "player2";
-    const playerNum =  playerType === "player1" ? 1 : 2;
+    const playerNum = playerType === "player1" ? 1 : 2;
 
     const row = checkLowestRow(board, column);
-    if (row === -1) return sendError(res, STATUS_CODE.BAD_REQUEST, ERROR_MESSAGES.COLUMN_FULL);
+    if (row === -1)
+      return sendError(
+        res,
+        STATUS_CODE.BAD_REQUEST,
+        ERROR_MESSAGES.COLUMN_FULL,
+      );
 
-    // Drop the disc
+    // this is to drop the disc
     board[column][row] = playerNum;
     const isWin = checkWin(board, column, row, playerType);
-    
-    // Determine next turn or game over state. If player2Id is missing in PVE, it's the CPU!
-    let nextTurn = game.currentTurn === game.player1Id ? (game.player2Id || "CPU") : game.player1Id;
-    let newStatus = game.status as "IN_PROGRESS" | "COMPLETED" | "DRAW" | "FORFEITED" | "ABANDONED";
+
+    // this is to determine next turn or a game over state.
+    // If player2Id is missing in PVP, it's the CPU that is playing!
+
+    let nextTurn =
+      game.currentTurn === game.player1Id
+        ? game.player2Id || "CPU"
+        : game.player1Id;
+    let newStatus = game.status as
+      | "IN_PROGRESS"
+      | "COMPLETED"
+      | "DRAW"
+      | "FORFEITED"
+      | "ABANDONED";
     let winnerId = null;
 
     if (isWin) {
       newStatus = "COMPLETED";
       winnerId = userId;
     } else if (game.totalMoves + 1 >= GAME.BOARD_COLS * GAME.BOARD_ROWS) {
-      newStatus = "DRAW"; // Board is full
+      newStatus = "DRAW"; // this is for when the board is full
     }
 
-    // --- ELO Calculation ---
+    // --- this is for the ELO Calculation ---
     let p1NewElo = game.player1.eloRating;
     let p2NewElo = game.player2 ? game.player2.eloRating : 1000;
 
@@ -243,7 +300,7 @@ export const makeMove = async (
       p1NewElo = eloUpdate.newRatingA;
       p2NewElo = eloUpdate.newRatingB;
 
-      // Update the actual User profiles
+      // this is to update the User profiles after a game
       await prisma.$transaction([
         prisma.user.update({
           where: { id: game.player1Id },
@@ -260,10 +317,10 @@ export const makeMove = async (
       ]);
     }
 
-    // Save everything back to DB
+    // this saves everything back to DB
     const updatedGame = await prisma.game.update({
       where: { id: gameId as string },
-      data: { 
+      data: {
         boardState: board,
         currentTurn: nextTurn as string,
         totalMoves: { increment: 1 },
@@ -271,7 +328,7 @@ export const makeMove = async (
         winnerId: winnerId,
         lastActiveAt: new Date(),
         player1Elo: p1NewElo, // Saves snapshot of final ELO to game history
-        player2Elo: p2NewElo
+        player2Elo: p2NewElo,
       },
     });
 
@@ -280,7 +337,7 @@ export const makeMove = async (
       checkMatchAchievements(game.id).catch(console.error);
     }
 
-    // 3. Emit socket event
+    // 3.this is for emitting a socket event for when a player makes a move
     if (req.io) {
       req.io.to(gameId as string).emit("move_made", {
         playerId: userId,
@@ -288,14 +345,26 @@ export const makeMove = async (
         row,
         board,
         isWin,
-        newStatus
+        newStatus,
       });
     }
 
     // 4. TRIGGER AI MOVE IF NEEDED
     // If the mode is PVC (Player vs CPU), and it's suddenly the CPU's turn, calculate their move asynchronously!
-    if (game.gameMode === "PVC" && nextTurn === "CPU" && newStatus === "IN_PROGRESS") {
+    if (
+      game.gameMode === "PVC" &&
+      nextTurn === "CPU" &&
+      newStatus === "IN_PROGRESS"
+    ) {
       setTimeout(() => triggerCpuMove(game.id, req.io), 1000); // Wait 1 sec to feel "human"
+    }
+
+    // 5. START TIMERS FOR PVP/ONLINE MATCHES
+    if (
+      game.gameMode !== "PVC" && 
+      newStatus === "IN_PROGRESS"
+    ) {
+      startTurnTimer(game.id, nextTurn as string, req.io);
     }
 
     return sendSuccess(res, STATUS_CODE.Ok, "Move recorded", updatedGame);
@@ -309,25 +378,31 @@ export const makeMove = async (
 async function triggerCpuMove(gameId: string, io: any) {
   try {
     const game = await prisma.game.findUnique({ where: { id: gameId } });
-    if (!game || game.status !== "IN_PROGRESS" || game.currentTurn !== "CPU") return;
+    if (!game || game.status !== "IN_PROGRESS" || game.currentTurn !== "CPU")
+      return;
 
     // 1. Ask the Minimax AI for the best column
     const board = game.boardState as number[][];
     const cpuCol = getBestMove(board, 4); // Depth 4 is a medium-hard difficulty
     const cpuRow = checkLowestRow(board, cpuCol);
-    
+
     if (cpuRow === -1) return; // Should never happen with AI
 
     // 2. Drop the AI's piece
     board[cpuCol][cpuRow] = 2; // CPU is always considered Player 2 (🟡)
     const isWin = checkWin(board, cpuCol, cpuRow, "player2");
 
-    let newStatus = game.status as "IN_PROGRESS" | "COMPLETED" | "DRAW" | "FORFEITED" | "ABANDONED";
+    let newStatus = game.status as
+      | "IN_PROGRESS"
+      | "COMPLETED"
+      | "DRAW"
+      | "FORFEITED"
+      | "ABANDONED";
     let winnerId = null;
 
     if (isWin) {
       newStatus = "COMPLETED";
-      winnerId = "CPU"; // The system beat the human!
+      winnerId = "CPU"; // The system beat the human
     } else if (game.totalMoves + 1 >= GAME.BOARD_COLS * GAME.BOARD_ROWS) {
       newStatus = "DRAW" as any;
     }
@@ -341,8 +416,8 @@ async function triggerCpuMove(gameId: string, io: any) {
         status: newStatus as any,
         winnerId: winnerId,
         totalMoves: { increment: 1 },
-        lastActiveAt: new Date()
-      }
+        lastActiveAt: new Date(),
+      },
     });
 
     // 3.5 Trigger Achievements for the Human if the CPU magically caused a Draw
@@ -358,7 +433,7 @@ async function triggerCpuMove(gameId: string, io: any) {
         row: cpuRow,
         board,
         isWin,
-        newStatus
+        newStatus,
       });
     }
   } catch (error) {
@@ -379,4 +454,3 @@ export const createAiGameRoom = async (
     next(error);
   }
 };
-

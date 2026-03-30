@@ -52,7 +52,6 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
 
-
 app.get("/", (req: Request, res: Response) => {
   res.json({
     message: "Connect Four API is running 🎮 ",

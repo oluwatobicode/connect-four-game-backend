@@ -495,7 +495,7 @@ Phase 2 — Leaderboard + ELO
 Phase 3 — Achievements
   ✅GET /achievements
  ✅ GET /achievements/me
-  Achievement unlock triggers after game ends
+  ✅Achievement unlock triggers after game ends
 
 Phase 4 — WebSocket Foundation
   ✅ Set up Socket.io on the backend
