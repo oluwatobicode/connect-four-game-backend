@@ -34,7 +34,9 @@
     "prisma": "^7.5.0",
     "resend": "^6.9.4",
     "socket.io": "^4.8.3",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "swagger-ui-express": "^5.0.1",
+    "yamljs": "^0.3.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -43,6 +45,8 @@
     "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.20.0",
     "@types/socket.io": "^3.0.1",
+    "@types/swagger-ui-express": "^4.1.8",
+    "@types/yamljs": "^0.2.34",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

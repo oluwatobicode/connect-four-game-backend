@@ -19,6 +19,9 @@ import { Server } from "socket.io";
 import http from "http";
 import { socketAuth } from "./middleware/socket.middleware.js";
 import { initCleanupJob } from "./services/gameCleanup.service.js";
+import swaggerUi from "swagger-ui-express";
+import YAML from "yamljs";
+import path from "path";
 
 const app: Application = express();
 const PORT = process.env.PORT || 5000;
@@ -48,9 +51,22 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(cors());
+app.use(
+  cors({
+    origin:
+      process.env.CLIENT_URL ||
+      "http://localhost:5173" ||
+      "https://connect-four-gane.vercel.app",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  }),
+);
 app.use(express.json());
 app.use(morgan("dev"));
+
+// Load and serve Swagger UI documentation
+const swaggerDocument = YAML.load(path.join(process.cwd(), "swagger.yml"));
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.get("/", (req: Request, res: Response) => {
   res.json({

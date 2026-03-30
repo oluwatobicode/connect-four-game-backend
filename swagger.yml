@@ -1,0 +1,233 @@
+openapi: 3.0.0
+info:
+  title: Connect Four Multiplayer API
+  description: A real-time, competitive Connect Four multiplayer engine featuring WebSockets, Minimax AI, automated Elo ranking, and an asynchronous achievement system.
+  version: 1.0.0
+  contact:
+    name: Oluwatobi
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local Development Server
+  - url: https://your-render-url.onrender.com/api/v1
+    description: Production Server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ================= AUTHENTICATION ================= #
+  /auth/google:
+    post:
+      summary: Google OAuth Login
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                idToken:
+                  type: string
+      responses:
+        '200':
+          description: Successfully authenticated via Google
+
+  /auth/logout:
+    post:
+      summary: Logout User
+      tags: [Auth]
+      responses:
+        '200':
+          description: Successfully logged out
+
+  /auth/refresh:
+    post:
+      summary: Refresh Access Token
+      tags: [Auth]
+      responses:
+        '200':
+          description: Returns new access token
+
+  # ================= PROFILE ================= #
+  /profile:
+    get:
+      summary: Get Current User Profile
+      tags: [Profile]
+      responses:
+        '200':
+          description: Current user's profile and aggregated game stats
+    
+    put:
+      summary: Update Profile
+      tags: [Profile]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                avatar:
+                  type: string
+      responses:
+        '200':
+          description: Profile updated successfully
+        '409':
+          description: Username already taken
+          
+    delete:
+      summary: Soft Delete Profile
+      tags: [Profile]
+      responses:
+        '200':
+          description: User anonymized successfully
+
+  /profile/{userId}:
+    get:
+      summary: Get Public Profile
+      description: Fetches public stats of a specific user.
+      tags: [Profile]
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User public stats
+
+  /profile/{userId}/game-history:
+    get:
+      summary: Get User's Game History
+      tags: [Profile]
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Returns the user's last 20 matches
+
+  # ================= GAME ENGINE ================= #
+  /game/create:
+    post:
+      summary: Create Game Room
+      tags: [Game]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                gameMode:
+                  type: string
+                  enum: [PVP, PVC, ONLINE]
+      responses:
+        '201':
+          description: Returns a 6-letter roomCode for multiplayer
+
+  /game/join:
+    post:
+      summary: Join Game Room
+      tags: [Game]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                roomCode:
+                  type: string
+      responses:
+        '200':
+          description: Joined game successfully as Player 2
+
+  /game/spectate:
+    post:
+      summary: Spectate Match
+      tags: [Game]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                roomCode:
+                  type: string
+      responses:
+        '200':
+          description: Returns the initial game state with a 'SPECTATOR' role flag
+
+  /game/{id}:
+    get:
+      summary: Get Live Game State
+      tags: [Game]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Returns the 6x7 2D array board state
+
+  /game/{id}/move:
+    post:
+      summary: Submit Game Move
+      tags: [Game]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                column:
+                  type: integer
+                  minimum: 0
+                  maximum: 6
+      responses:
+        '200':
+          description: Move validated. Backend broadcasts Socket.io event and restarts 30-second stall timer.
+        '403':
+          description: Not your turn
+        '400':
+          description: Column is completely full
+
+  # ================= LEADERBOARD & ACHIEVEMENTS ================= #
+  /leaderboard/all:
+    get:
+      summary: Global ELO Leaderboard
+      tags: [Leaderboard]
+      responses:
+        '200':
+          description: List of top players ranked by FIDE Elo score
+          
+  /achievements/me:
+    get:
+      summary: Get My Achievements
+      tags: [Achievements]
+      responses:
+        '200':
+          description: Returns list of unlocked badges (e.g., Speed Demon, First Blood)
