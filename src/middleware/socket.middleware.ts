@@ -1,10 +1,11 @@
 import { Socket } from "socket.io";
 import { verifyAccessToken } from "../utils/jwt.utils.js";
-import { ERROR_MESSAGES } from "../config/constants.config.js";
+import { ERROR_MESSAGES, USER_MESSAGES } from "../config/constants.config.js";
+import prisma from "../config/prisma.js";
 
 type SocketNext = (err?: Error) => void;
 
-export const socketAuth = (socket: Socket, next: SocketNext) => {
+export const socketAuth = async (socket: Socket, next: SocketNext) => {
   try {
     const tokenFromAuth = socket.handshake.auth?.token;
     const headerAuth = socket.handshake.headers.authorization;
@@ -20,7 +21,24 @@ export const socketAuth = (socket: Socket, next: SocketNext) => {
     }
 
     const decoded = verifyAccessToken(token);
-    socket.data.userId = decoded.userId;
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: {
+        id: true,
+        isVerified: true,
+        authProvider: true,
+      },
+    });
+
+    if (!user) {
+      return next(new Error(ERROR_MESSAGES.NOT_LOGGED_IN));
+    }
+
+    if (user.authProvider !== "google" && !user.isVerified) {
+      return next(new Error(USER_MESSAGES.EMAIL_NOT_VERIFIED));
+    }
+
+    socket.data.userId = user.id;
 
     next();
   } catch (_error) {

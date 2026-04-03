@@ -1,9 +1,14 @@
 import { NextFunction, Request, Response } from "express";
-import { sendError } from "../interfaces/ApiResponse";
-import { ERROR_MESSAGES, STATUS_CODE } from "../config/constants.config";
-import { verifyAccessToken } from "../utils/jwt.utils";
+import { sendError } from "../interfaces/ApiResponse.js";
+import { ERROR_MESSAGES, STATUS_CODE, USER_MESSAGES } from "../config/constants.config.js";
+import { verifyAccessToken } from "../utils/jwt.utils.js";
+import prisma from "../config/prisma.js";
 
-export const protect = (req: Request, res: Response, next: NextFunction) => {
+export const protect = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -13,8 +18,28 @@ export const protect = (req: Request, res: Response, next: NextFunction) => {
 
     const token = authHeader.split(" ")[1];
     const decodedToken = verifyAccessToken(token);
+    const user = await prisma.user.findUnique({
+      where: { id: decodedToken.userId },
+      select: {
+        id: true,
+        isVerified: true,
+        authProvider: true,
+      },
+    });
 
-    req.user = decodedToken.userId;
+    if (!user) {
+      return sendError(res, STATUS_CODE.UNAUTHORIZED, ERROR_MESSAGES.NOT_LOGGED_IN);
+    }
+
+    if (user.authProvider !== "google" && !user.isVerified) {
+      return sendError(
+        res,
+        STATUS_CODE.FORBIDDEN,
+        USER_MESSAGES.EMAIL_NOT_VERIFIED,
+      );
+    }
+
+    req.user = user.id;
 
     next();
   } catch (error) {

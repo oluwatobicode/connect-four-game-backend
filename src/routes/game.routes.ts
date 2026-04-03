@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { gameController } from "../controllers";
-import { protect } from "../middleware/protected.middleware";
+import { gameController } from "../controllers/index.js";
+import { protect } from "../middleware/protected.middleware.js";
 
 const router = Router();
 

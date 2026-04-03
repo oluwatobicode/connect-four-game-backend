@@ -2,29 +2,29 @@ import { NextFunction, Request, Response } from "express";
 import {
   createLocalUser,
   loginWithGoogleService,
-} from "../services/auth.service";
+} from "../services/auth.service.js";
 import {
   generateAccessToken,
   generateRefreshToken,
   generateResetPasswordToken,
   verifyRefreshToken,
   verifyResetPasswordToken,
-} from "../utils/jwt.utils";
+} from "../utils/jwt.utils.js";
 import {
   AUTH,
   ERROR_MESSAGES,
   STATUS_CODE,
   SUCCESS_MESSAGES,
   USER_MESSAGES,
-} from "../config/constants.config";
-import prisma from "../config/prisma";
-import { sendError, sendSuccess } from "../interfaces/ApiResponse";
+} from "../config/constants.config.js";
+import prisma from "../config/prisma.js";
+import { sendError, sendSuccess } from "../interfaces/ApiResponse.js";
 import bcrypt from "bcrypt";
-import { otpCode } from "../utils/otp.utils";
+import { otpCode } from "../utils/otp.utils.js";
 import {
   sendOtpEmail,
   sendResetPasswordLinkEmail,
-} from "../services/email.service";
+} from "../services/email.service.js";
 
 // signing up locally
 export const signUp = async (
@@ -95,12 +95,6 @@ export const login = async (
 
     const user = await prisma.user.findUnique({
       where: { email },
-      omit: {
-        isVerified: true,
-        authProvider: true,
-        createdAt: true,
-        updatedAt: true,
-      },
     });
 
     if (!user) {
@@ -109,10 +103,19 @@ export const login = async (
       });
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      password,
-      user.password as string,
-    );
+    if (!user.password) {
+      return res.status(STATUS_CODE.BAD_REQUEST).json({
+        message: "This account uses Google sign-in",
+      });
+    }
+
+    if (!user.isVerified) {
+      return res.status(STATUS_CODE.FORBIDDEN).json({
+        message: USER_MESSAGES.EMAIL_NOT_VERIFIED,
+      });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
       return res.status(STATUS_CODE.UNAUTHORIZED).json({
@@ -205,6 +208,14 @@ export const refreshToken = async (
         res,
         STATUS_CODE.UNAUTHORIZED,
         ERROR_MESSAGES.NOT_FOUND("User"),
+      );
+    }
+
+    if (!user.isVerified) {
+      return sendError(
+        res,
+        STATUS_CODE.FORBIDDEN,
+        USER_MESSAGES.EMAIL_NOT_VERIFIED,
       );
     }
 

@@ -1,7 +1,7 @@
 import { OAuth2Client } from "google-auth-library";
-import prisma from "../config/prisma";
+import prisma from "../config/prisma.js";
 import bcrypt from "bcrypt";
-import { AUTH } from "../config/constants.config";
+import { AUTH } from "../config/constants.config.js";
 
 export const loginWithGoogleService = async (googleToken: string) => {
   const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);

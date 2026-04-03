@@ -1,6 +1,6 @@
-import prisma from "../config/prisma";
-import { ACHIEVEMENTS } from "../config/achievements.config";
-import { GameResult } from "../types/GameResult";
+import prisma from "../config/prisma.js";
+import { ACHIEVEMENTS } from "../config/achievements.config.js";
+import type { GameResult } from "../types/GameResult.js";
 
 // Check and unlock achievements after a game ends
 export const checkAchievements = async (

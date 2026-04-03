@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { leaderboardController } from "../controllers";
-import { protect } from "../middleware/protected.middleware";
+import { leaderboardController } from "../controllers/index.js";
+import { protect } from "../middleware/protected.middleware.js";
 
 const router = Router();
 

@@ -9,11 +9,11 @@
   "license": "ISC",
   "author": "codingninja",
   "type": "module",
-  "main": "server.ts",
+  "main": "dist/src/server.js",
   "scripts": {
     "dev": "nodemon --exec tsx src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/src/server.js"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.5.0",

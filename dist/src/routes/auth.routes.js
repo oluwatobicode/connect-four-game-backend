@@ -1,0 +1,13 @@
+import { Router } from "express";
+import { authController } from "../controllers/index.js";
+const router = Router();
+router.post("/signup", authController.signUp);
+router.post("/login", authController.login);
+router.post("/google", authController.loginWithGoogle);
+router.post("/logout", authController.logout);
+router.post("/refresh", authController.refreshToken);
+router.post("/otp", authController.sendOtp);
+router.post("/otp/verify", authController.verifyOtpWithEmail);
+router.post("/password/reset-link", authController.sendResetPasswordLink);
+router.post("/password/change", authController.changePassword);
+export default router;

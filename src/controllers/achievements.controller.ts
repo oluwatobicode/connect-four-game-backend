@@ -1,8 +1,8 @@
 import { NextFunction, Request, Response } from "express";
-import prisma from "../config/prisma";
-import { ACHIEVEMENTS } from "../config/achievements.config";
-import { STATUS_CODE } from "../config/constants.config";
-import { sendSuccess, sendError } from "../interfaces/ApiResponse";
+import prisma from "../config/prisma.js";
+import { ACHIEVEMENTS } from "../config/achievements.config.js";
+import { STATUS_CODE } from "../config/constants.config.js";
+import { sendSuccess, sendError } from "../interfaces/ApiResponse.js";
 
 // get all user achievements
 export const getAllAchievements = (

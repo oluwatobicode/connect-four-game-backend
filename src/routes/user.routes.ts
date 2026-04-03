@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { userController } from "../controllers";
+import { userController } from "../controllers/index.js";
 
 import { protect } from "../middleware/protected.middleware.js";
 

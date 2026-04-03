@@ -16,7 +16,20 @@ import { getBestMove } from "../utils/minmax.utils.js";
 import { checkMatchAchievements } from "../utils/achievements.utils.js";
 import { clearTurnTimer, startTurnTimer } from "../services/timer.service.js";
 
-// Create a new game session, either PVP or vs CPU
+const normalizeRoomCode = (roomCode: unknown) => {
+  if (typeof roomCode !== "string") return null;
+
+  const trimmedRoomCode = roomCode.trim().toUpperCase();
+  return trimmedRoomCode ? trimmedRoomCode : null;
+};
+
+const isValidColumn = (column: unknown): column is number =>
+  typeof column === "number" &&
+  Number.isInteger(column) &&
+  column >= 0 &&
+  column < GAME.BOARD_COLS;
+
+// Create a new game session, either PVP or vs CPU mode
 export const createGameRoom = async (
   req: Request,
   res: Response,
@@ -89,9 +102,18 @@ export const joinGameRoom = async (
   try {
     const { roomCode } = req.body;
     const userId = req.user as string;
+    const normalizedRoomCode = normalizeRoomCode(roomCode);
+
+    if (!normalizedRoomCode) {
+      return sendError(
+        res,
+        STATUS_CODE.BAD_REQUEST,
+        ERROR_MESSAGES.REQUIRED_FIELD("roomCode"),
+      );
+    }
 
     const game = await prisma.game.findUnique({
-      where: { roomCode: (roomCode as string).toUpperCase() },
+      where: { roomCode: normalizedRoomCode },
     });
     if (!game) return sendError(res, STATUS_CODE.NOT_FOUND, "Game not found");
 
@@ -111,16 +133,32 @@ export const joinGameRoom = async (
       return sendError(res, STATUS_CODE.CONFLICT, "Room is full");
     }
 
-    const updatedGame = await prisma.game.update({
-      where: { id: game.id },
+    if (game.player2Id === userId) {
+      return sendSuccess(res, STATUS_CODE.Ok, "Joined room", game);
+    }
+
+    const joinResult = await prisma.game.updateMany({
+      where: {
+        id: game.id,
+        status: "IN_PROGRESS",
+        player2Id: null,
+      },
       data: {
         player2Id: userId,
         lastActiveAt: new Date(),
       },
     });
 
+    if (joinResult.count === 0) {
+      return sendError(res, STATUS_CODE.CONFLICT, "Room is full");
+    }
+
+    const updatedGame = await prisma.game.findUnique({
+      where: { id: game.id },
+    });
+
     // this is for emitting a socket event for when a player joins
-    if (req.io) {
+    if (req.io && updatedGame) {
       req.io.to(game.id).emit("player_joined", { userId });
     }
 
@@ -146,12 +184,42 @@ export const leaveGameRoom = async (
     });
     if (!game) return sendError(res, STATUS_CODE.NOT_FOUND, "Game not found");
 
+    const isParticipant =
+      game.player1Id === userId || game.player2Id === userId;
+
+    if (!isParticipant) {
+      return sendError(
+        res,
+        STATUS_CODE.FORBIDDEN,
+        ERROR_MESSAGES.UNAUTHORIZED,
+      );
+    }
+
+    if (game.status !== "IN_PROGRESS") {
+      return sendError(
+        res,
+        STATUS_CODE.BAD_REQUEST,
+        ERROR_MESSAGES.GAME_ALREADY_ENDED,
+      );
+    }
+
+    const winnerId = userId === game.player1Id ? game.player2Id : game.player1Id;
+    if (!winnerId) {
+      return sendError(
+        res,
+        STATUS_CODE.BAD_REQUEST,
+        "Cannot leave a room before another player joins",
+      );
+    }
+
+    clearTurnTimer(gameId as string);
+
     //  set the status to forfeited and handle forfeit
     const updatedGame = await prisma.game.update({
       where: { id: gameId as string },
       data: {
         status: "FORFEITED",
-        winnerId: userId === game.player1Id ? game.player2Id : game.player1Id,
+        winnerId,
         lastActiveAt: new Date(),
       },
     });
@@ -176,13 +244,14 @@ export const spectateGame = async (
 ) => {
   try {
     const { roomCode } = req.body;
+    const normalizedRoomCode = normalizeRoomCode(roomCode);
 
-    if (!roomCode) {
+    if (!normalizedRoomCode) {
       return sendError(res, STATUS_CODE.BAD_REQUEST, "Room code is required to spectate");
     }
 
     const game = await prisma.game.findUnique({
-      where: { roomCode: roomCode.toUpperCase() },
+      where: { roomCode: normalizedRoomCode },
       include: {
         player1: { select: { id: true, username: true, avatar: true } },
         player2: { select: { id: true, username: true, avatar: true } },
@@ -213,14 +282,11 @@ export const makeMove = async (
     const { column } = req.body;
     const userId = req.user as string;
 
-    // 0. Instantly pause the 30-second clock so they don't forfeit while the server calculates
-    clearTurnTimer(gameId as string);
-
-    if (column === undefined) {
+    if (!isValidColumn(column)) {
       return sendError(
         res,
         STATUS_CODE.BAD_REQUEST,
-        ERROR_MESSAGES.REQUIRED_FIELD("column"),
+        ERROR_MESSAGES.INVALID_MOVE,
       );
     }
 
@@ -234,6 +300,17 @@ export const makeMove = async (
     });
 
     if (!game) return sendError(res, STATUS_CODE.NOT_FOUND, "Game not found");
+
+    const isParticipant =
+      game.player1Id === userId || game.player2Id === userId;
+    if (!isParticipant) {
+      return sendError(
+        res,
+        STATUS_CODE.FORBIDDEN,
+        ERROR_MESSAGES.UNAUTHORIZED,
+      );
+    }
+
     if (game.status !== "IN_PROGRESS")
       return sendError(
         res,
@@ -248,6 +325,8 @@ export const makeMove = async (
       );
 
     // 2. Logic to update board
+    clearTurnTimer(gameId as string);
+
     const board = game.boardState as number[][];
     const playerType = game.player1Id === userId ? "player1" : "player2";
     const playerNum = playerType === "player1" ? 1 : 2;

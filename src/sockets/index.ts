@@ -17,6 +17,8 @@ export const setupSockets = (io: Server) => {
 
       // 1. Did they drop while actively inside a game room?
       const gameId = activePlayers.get(socket.data.userId);
+      activePlayers.delete(socket.data.userId);
+
       if (gameId) {
         // 2. Start the 30-second Abandonment clock! ⏳
         startDisconnectTimer(gameId, socket.data.userId, io);
@@ -31,7 +33,7 @@ export const setupSockets = (io: Server) => {
       activePlayers.set(socket.data.userId, gameId); 
 
       // 2. THE RESCUE: If they just refreshed their page, this cancels the disconnect timer! 🚀
-      clearDisconnectTimer(gameId);
+      clearDisconnectTimer(gameId, socket.data.userId);
 
       console.log(`User ${socket.data.userId} joined game room: ${gameId}`);
 
@@ -44,6 +46,7 @@ export const setupSockets = (io: Server) => {
 
       // 1. They clicked a "Back" button or intentionally left 
       activePlayers.delete(socket.data.userId);
+      clearDisconnectTimer(gameId, socket.data.userId);
 
       console.log(`User ${socket.data.userId} left game room: ${gameId}`);
 
@@ -54,6 +57,7 @@ export const setupSockets = (io: Server) => {
     socket.on("send_message", (data: { message: string; gameId: string }) => {
       const { gameId, message } = data;
 
+      if (typeof message !== "string" || typeof gameId !== "string") return;
       if (!message.trim()) return;
 
       io.to(gameId).emit("receive_message", {

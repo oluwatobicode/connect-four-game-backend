@@ -1,4 +1,4 @@
-import { GAME } from "../config/constants.config";
+import { GAME } from "../config/constants.config.js";
 
 export const createInitialBoard = (): number[][] => {
   // We use 7 columns, each containing 6 rows.

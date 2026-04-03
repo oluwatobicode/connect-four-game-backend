@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
-import prisma from "../config/prisma";
-import { STATUS_CODE } from "../config/constants.config";
-import { sendSuccess } from "../interfaces/ApiResponse";
+import prisma from "../config/prisma.js";
+import { STATUS_CODE } from "../config/constants.config.js";
+import { sendSuccess } from "../interfaces/ApiResponse.js";
 
 // Get all players ranked by ELO rating, highest to lowest
 export const getAllRankings = async (

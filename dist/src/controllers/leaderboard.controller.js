@@ -1,0 +1,55 @@
+import prisma from "../config/prisma.js";
+import { STATUS_CODE } from "../config/constants.config.js";
+import { sendSuccess } from "../interfaces/ApiResponse.js";
+// Get all players ranked by ELO rating, highest to lowest
+export const getAllRankings = async (req, res, next) => {
+    try {
+        const rankings = await prisma.user.findMany({
+            orderBy: { eloRating: "desc" },
+            select: {
+                id: true,
+                avatar: true,
+                username: true,
+                eloRating: true,
+            },
+        });
+        const rankedData = rankings.map((user, index) => {
+            return { ...user, rank: index + 1 };
+        });
+        return sendSuccess(res, STATUS_CODE.Ok, "Fetched successfully", rankedData);
+    }
+    catch (error) {
+        console.log(error);
+        next(error);
+    }
+};
+//Get current user's position and rank on the leaderboard
+export const getMyRanking = async (req, res, next) => {
+    try {
+        const myRanking = await prisma.user.findUnique({
+            where: { id: req.user },
+            select: {
+                id: true,
+                username: true,
+                eloRating: true,
+            },
+        });
+        if (!myRanking) {
+            return res.status(STATUS_CODE.NOT_FOUND).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+        const rank = await prisma.user.count({
+            where: { eloRating: { gt: myRanking.eloRating } },
+        });
+        return sendSuccess(res, STATUS_CODE.Ok, "Fetched successfully", {
+            ...myRanking,
+            rank: rank + 1,
+        });
+    }
+    catch (error) {
+        console.log(error);
+        next(error);
+    }
+};

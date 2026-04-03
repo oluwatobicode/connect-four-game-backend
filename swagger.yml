@@ -5,8 +5,9 @@ info:
   version: 1.0.0
   contact:
     name: Oluwatobi
+
 servers:
-  - url: http://localhost:3000/api/v1
+  - url: http://localhost:5000/api/v1
     description: Local Development Server
   - url: https://your-render-url.onrender.com/api/v1
     description: Production Server
@@ -18,14 +19,183 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
+  schemas:
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Operation completed successfully
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Invalid credentials
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: clx123example
+        email:
+          type: string
+          format: email
+          example: player@example.com
+        username:
+          type: string
+          example: connect_master
+        avatar:
+          type: string
+          nullable: true
+          example: https://example.com/avatar.png
+        authProvider:
+          type: string
+          enum: [local, google]
+          example: google
+        googleId:
+          type: string
+          nullable: true
+          example: "11223344556677889900"
+        isVerified:
+          type: boolean
+          example: true
+
+    SignUpRequest:
+      type: object
+      required: [email, password, username]
+      properties:
+        email:
+          type: string
+          format: email
+          example: player@example.com
+        password:
+          type: string
+          format: password
+          example: StrongPass123!
+        username:
+          type: string
+          example: player_one
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: player@example.com
+        password:
+          type: string
+          format: password
+          example: StrongPass123!
+
+    GoogleAuthRequest:
+      type: object
+      required: [googleToken]
+      properties:
+        googleToken:
+          type: string
+          description: Google ID token returned by the frontend Google sign-in flow.
+          example: eyJhbGciOiJSUzI1NiIsImtpZCI6Ij...
+
+    RefreshTokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    EmailRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          example: player@example.com
+
+    VerifyOtpRequest:
+      type: object
+      required: [email, otp]
+      properties:
+        email:
+          type: string
+          format: email
+          example: player@example.com
+        otp:
+          type: string
+          example: "123456"
+
+    ChangePasswordRequest:
+      type: object
+      required: [token, newPassword]
+      properties:
+        token:
+          type: string
+          description: Password reset token generated from the reset link flow.
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        newPassword:
+          type: string
+          format: password
+          example: NewStrongPass123!
+
+    TokenPairResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Check your email for an OTP to verify your account
+        accessToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    AuthResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Login successful
+        user:
+          $ref: '#/components/schemas/User'
+        accessToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    RefreshAccessTokenResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Token refreshed successfully
+        data:
+          type: object
+          properties:
+            accessToken:
+              type: string
+              example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
 security:
   - bearerAuth: []
 
 paths:
   # ================= AUTHENTICATION ================= #
-  /auth/google:
+  /auth/signup:
     post:
-      summary: Google OAuth Login
+      summary: Register a local account
+      description: Creates a new email/password account, generates access and refresh tokens, and sends an OTP email for verification.
       tags: [Auth]
       security: []
       requestBody:
@@ -33,29 +203,290 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                idToken:
-                  type: string
+              $ref: '#/components/schemas/SignUpRequest'
+      responses:
+        '201':
+          description: Account created and OTP sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPairResponse'
+        '400':
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      summary: Login with email and password
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
       responses:
         '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Missing fields or account uses Google sign-in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Email not verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/google:
+    post:
+      summary: Login or create account with Google
+      description: Verifies a Google ID token, then logs in the user or creates a new Google-backed account.
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoogleAuthRequest'
+      responses:
+        '201':
           description: Successfully authenticated via Google
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Missing Google token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/logout:
     post:
-      summary: Logout User
+      summary: Logout user
+      description: Blacklists the provided refresh token so it can no longer be used.
       tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
       responses:
         '200':
           description: Successfully logged out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Missing refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/refresh:
     post:
-      summary: Refresh Access Token
+      summary: Refresh access token
+      description: Validates a refresh token and returns a new access token if the refresh token is still valid and not blacklisted.
       tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
       responses:
         '200':
-          description: Returns new access token
+          description: New access token generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshAccessTokenResponse'
+        '400':
+          description: Missing refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid, revoked, or user-not-found refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: User email not verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/otp:
+    post:
+      summary: Send email verification OTP
+      description: Sends a new OTP to a user's email if the account exists and is not already verified.
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailRequest'
+      responses:
+        '200':
+          description: OTP sent or email already verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Missing email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/otp/verify:
+    post:
+      summary: Verify email with OTP
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOtpRequest'
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Missing email or OTP
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: User not found or OTP is invalid/expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/password/reset-link:
+    post:
+      summary: Send reset password link
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailRequest'
+      responses:
+        '200':
+          description: Reset link sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Missing email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/password/change:
+    post:
+      summary: Change password with reset token
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Missing token or new password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid or expired reset token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   # ================= PROFILE ================= #
   /profile:
@@ -65,7 +496,7 @@ paths:
       responses:
         '200':
           description: Current user's profile and aggregated game stats
-    
+
     put:
       summary: Update Profile
       tags: [Profile]
@@ -85,7 +516,7 @@ paths:
           description: Profile updated successfully
         '409':
           description: Username already taken
-          
+
     delete:
       summary: Soft Delete Profile
       tags: [Profile]
@@ -223,7 +654,7 @@ paths:
       responses:
         '200':
           description: List of top players ranked by FIDE Elo score
-          
+
   /achievements/me:
     get:
       summary: Get My Achievements

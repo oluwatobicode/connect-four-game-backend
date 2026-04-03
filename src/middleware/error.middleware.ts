@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
-import { sendError } from "../interfaces/ApiResponse";
-import { ERROR_MESSAGES, STATUS_CODE } from "../config/constants.config";
+import { sendError } from "../interfaces/ApiResponse.js";
+import { ERROR_MESSAGES, STATUS_CODE } from "../config/constants.config.js";
 
 interface AppError extends Error {
   statusCode?: number;

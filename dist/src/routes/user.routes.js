@@ -1,0 +1,10 @@
+import { Router } from "express";
+import { userController } from "../controllers/index.js";
+import { protect } from "../middleware/protected.middleware.js";
+const router = Router();
+router.get("/", protect, userController.getProfile);
+router.put("/", protect, userController.updateProfile);
+router.delete("/", protect, userController.deleteProfile);
+router.get("/:userId", userController.getAUserProfile);
+router.get("/:userId/game-history", userController.getAUserGameHistory);
+export default router;
