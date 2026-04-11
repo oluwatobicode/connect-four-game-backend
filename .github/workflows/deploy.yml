@@ -11,16 +11,20 @@ jobs:
 
     steps:
       - name: Deploy to EC2
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_PRIVATE_KEY }}
-          script: |
-            cd ~/connect-four-game-backend
-            git pull origin main
-            npm install
-            npm run build
-            npx prisma generate
-            npx prisma migrate deploy
+        env:
+          PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
+          HOST: ${{ secrets.EC2_HOST }}
+          USERNAME: ${{ secrets.EC2_USERNAME }}
+        run: |
+          echo "$PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+          ssh -o StrictHostKeyChecking=no -i private_key.pem $USERNAME@$HOST "
+            cd ~/connect-four-game-backend &&
+            git pull origin main &&
+            npm install &&
+            npm run build &&
+            npx prisma generate &&
+            npx prisma migrate deploy &&
             pm2 restart connect-four
+          "
+          rm -f private_key.pem
