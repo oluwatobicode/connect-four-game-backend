@@ -16,7 +16,7 @@ const isValidColumn = (column) => typeof column === "number" &&
     Number.isInteger(column) &&
     column >= 0 &&
     column < GAME.BOARD_COLS;
-// Create a new game session, either PVP or vs CPU
+// Create a new game session, either PVP or vs CPU mode
 export const createGameRoom = async (req, res, next) => {
     try {
         const userId = req.user;
@@ -175,7 +175,7 @@ export const spectateGame = async (req, res, next) => {
         // The frontend can now use this 'role' field to hide the player controls!
         return sendSuccess(res, STATUS_CODE.Ok, "Spectating game", {
             ...game,
-            role: "SPECTATOR"
+            role: "SPECTATOR",
         });
     }
     catch (error) {
@@ -299,8 +299,7 @@ export const makeMove = async (req, res, next) => {
             setTimeout(() => triggerCpuMove(game.id, req.io), 1000); // Wait 1 sec to feel "human"
         }
         // 5. START TIMERS FOR PVP/ONLINE MATCHES
-        if (game.gameMode !== "PVC" &&
-            newStatus === "IN_PROGRESS") {
+        if (game.gameMode !== "PVC" && newStatus === "IN_PROGRESS") {
             startTurnTimer(game.id, nextTurn, req.io);
         }
         return sendSuccess(res, STATUS_CODE.Ok, "Move recorded", updatedGame);

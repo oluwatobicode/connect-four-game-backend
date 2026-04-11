@@ -22,7 +22,7 @@ export const sendResetPasswordLinkEmail = async (email, resetPasswordToken) => {
     <div>
     <h1>Reset password</h1>
     <p>Click on the link to reset your password</p>
-    <a href="${process.env.FRONTEND_URL}/reset-password/${resetPasswordToken}">Reset password</a>
+    <a href="http://localhost:5173/reset-password/${resetPasswordToken}">Reset password</a>
     </div>
     `,
     });

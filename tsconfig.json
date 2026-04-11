@@ -1,11 +1,13 @@
 {
   "compilerOptions": {
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    "module": "Node16",
+    "moduleResolution": "node16",
     "target": "ESNext",
     "strict": true,
+    "noImplicitAny": false,
     "esModuleInterop": true,
     "typeRoots": ["./node_modules/@types", "./src/types"],
     "outDir": "./dist"
-  }
+  },
+  "include": ["src/**/*", "generated/**/*", "prisma.config.ts"]
 }

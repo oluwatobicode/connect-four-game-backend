@@ -9,14 +9,13 @@ import { setupSockets } from "./sockets/index.js";
 import { Server } from "socket.io";
 import http from "http";
 import { socketAuth } from "./middleware/socket.middleware.js";
-import { initCleanupJob } from "./services/gameCleanup.service.js";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yamljs";
 import path from "path";
 const app = express();
 const PORT = process.env.PORT || 5000;
 // start-stale-game-cleanup
-initCleanupJob();
+// initCleanupJob();
 // create a http server and pass it to socket.io
 const server = http.createServer(app);
 // Initialize Socket.IO by passing the http server instance

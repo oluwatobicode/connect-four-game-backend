@@ -188,11 +188,7 @@ export const leaveGameRoom = async (
       game.player1Id === userId || game.player2Id === userId;
 
     if (!isParticipant) {
-      return sendError(
-        res,
-        STATUS_CODE.FORBIDDEN,
-        ERROR_MESSAGES.UNAUTHORIZED,
-      );
+      return sendError(res, STATUS_CODE.FORBIDDEN, ERROR_MESSAGES.UNAUTHORIZED);
     }
 
     if (game.status !== "IN_PROGRESS") {
@@ -203,7 +199,8 @@ export const leaveGameRoom = async (
       );
     }
 
-    const winnerId = userId === game.player1Id ? game.player2Id : game.player1Id;
+    const winnerId =
+      userId === game.player1Id ? game.player2Id : game.player1Id;
     if (!winnerId) {
       return sendError(
         res,
@@ -247,7 +244,11 @@ export const spectateGame = async (
     const normalizedRoomCode = normalizeRoomCode(roomCode);
 
     if (!normalizedRoomCode) {
-      return sendError(res, STATUS_CODE.BAD_REQUEST, "Room code is required to spectate");
+      return sendError(
+        res,
+        STATUS_CODE.BAD_REQUEST,
+        "Room code is required to spectate",
+      );
     }
 
     const game = await prisma.game.findUnique({
@@ -261,9 +262,9 @@ export const spectateGame = async (
     if (!game) return sendError(res, STATUS_CODE.NOT_FOUND, "Game not found");
 
     // The frontend can now use this 'role' field to hide the player controls!
-    return sendSuccess(res, STATUS_CODE.Ok, "Spectating game", { 
-      ...game, 
-      role: "SPECTATOR" 
+    return sendSuccess(res, STATUS_CODE.Ok, "Spectating game", {
+      ...game,
+      role: "SPECTATOR",
     });
   } catch (error) {
     console.log(error);
@@ -304,11 +305,7 @@ export const makeMove = async (
     const isParticipant =
       game.player1Id === userId || game.player2Id === userId;
     if (!isParticipant) {
-      return sendError(
-        res,
-        STATUS_CODE.FORBIDDEN,
-        ERROR_MESSAGES.UNAUTHORIZED,
-      );
+      return sendError(res, STATUS_CODE.FORBIDDEN, ERROR_MESSAGES.UNAUTHORIZED);
     }
 
     if (game.status !== "IN_PROGRESS")
@@ -356,7 +353,7 @@ export const makeMove = async (
       | "DRAW"
       | "FORFEITED"
       | "ABANDONED";
-    let winnerId = null;
+    let winnerId: string | null = null;
 
     if (isWin) {
       newStatus = "COMPLETED";
@@ -439,10 +436,7 @@ export const makeMove = async (
     }
 
     // 5. START TIMERS FOR PVP/ONLINE MATCHES
-    if (
-      game.gameMode !== "PVC" && 
-      newStatus === "IN_PROGRESS"
-    ) {
+    if (game.gameMode !== "PVC" && newStatus === "IN_PROGRESS") {
       startTurnTimer(game.id, nextTurn as string, req.io);
     }
 
@@ -477,7 +471,7 @@ async function triggerCpuMove(gameId: string, io: any) {
       | "DRAW"
       | "FORFEITED"
       | "ABANDONED";
-    let winnerId = null;
+    let winnerId: string | null = null;
 
     if (isWin) {
       newStatus = "COMPLETED";
