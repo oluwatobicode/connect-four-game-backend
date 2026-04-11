@@ -1,0 +1,26 @@
+name: Deploy Connect Four
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_PRIVATE_KEY }}
+          script: |
+            cd ~/connect-four-game-backend
+            git pull origin main
+            npm install
+            npm run build
+            npx prisma generate
+            npx prisma migrate deploy
+            pm2 restart connect-four

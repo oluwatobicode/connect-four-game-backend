@@ -27,7 +27,7 @@ const app: Application = express();
 const PORT = process.env.PORT || 5000;
 
 // start-stale-game-cleanup
-initCleanupJob();
+// initCleanupJob();
 
 // create a http server and pass it to socket.io
 const server = http.createServer(app);
