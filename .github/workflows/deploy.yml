@@ -18,13 +18,13 @@ jobs:
         run: |
           echo "$PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
-          ssh -o StrictHostKeyChecking=no -i private_key.pem $USERNAME@$HOST "
-            cd ~/connect-four-game-backend &&
-            git pull origin main &&
-            npm install &&
-            npm run build &&
-            npx prisma generate &&
-            npx prisma migrate deploy &&
+          ssh -o StrictHostKeyChecking=no -i private_key.pem $USERNAME@$HOST << 'EOF'
+            cd ~/connect-four-game-backend
+            git pull origin main
+            npm install
+            npm run build
+            npx prisma generate
+            npx prisma migrate deploy
             pm2 restart connect-four
-          "
+          EOF
           rm -f private_key.pem
