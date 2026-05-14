@@ -4,6 +4,7 @@ import {
   STATUS_CODE,
   ERROR_MESSAGES,
   GAME,
+  CPU_PLAYER_ID,
 } from "../config/constants.config.js";
 import { sendSuccess, sendError } from "../interfaces/ApiResponse.js";
 import {
@@ -324,7 +325,7 @@ export const makeMove = async (
     // 2. Logic to update board
     clearTurnTimer(gameId as string);
 
-    const board = game.boardState as number[][];
+    const board = structuredClone(game.boardState) as number[][];
     const playerType = game.player1Id === userId ? "player1" : "player2";
     const playerNum = playerType === "player1" ? 1 : 2;
 
@@ -345,7 +346,7 @@ export const makeMove = async (
 
     let nextTurn =
       game.currentTurn === game.player1Id
-        ? game.player2Id || "CPU"
+        ? game.player2Id || CPU_PLAYER_ID
         : game.player1Id;
     let newStatus = game.status as
       | "IN_PROGRESS"
@@ -429,7 +430,7 @@ export const makeMove = async (
     // If the mode is PVC (Player vs CPU), and it's suddenly the CPU's turn, calculate their move asynchronously!
     if (
       game.gameMode === "PVC" &&
-      nextTurn === "CPU" &&
+      nextTurn === CPU_PLAYER_ID &&
       newStatus === "IN_PROGRESS"
     ) {
       setTimeout(() => triggerCpuMove(game.id, req.io), 1000); // Wait 1 sec to feel "human"
@@ -451,11 +452,11 @@ export const makeMove = async (
 async function triggerCpuMove(gameId: string, io: any) {
   try {
     const game = await prisma.game.findUnique({ where: { id: gameId } });
-    if (!game || game.status !== "IN_PROGRESS" || game.currentTurn !== "CPU")
+    if (!game || game.status !== "IN_PROGRESS" || game.currentTurn !== CPU_PLAYER_ID)
       return;
 
     // 1. Ask the Minimax AI for the best column
-    const board = game.boardState as number[][];
+    const board = structuredClone(game.boardState) as number[][];
     const cpuCol = getBestMove(board, 4); // Depth 4 is a medium-hard difficulty
     const cpuRow = checkLowestRow(board, cpuCol);
 
@@ -475,7 +476,7 @@ async function triggerCpuMove(gameId: string, io: any) {
 
     if (isWin) {
       newStatus = "COMPLETED";
-      winnerId = "CPU"; // The system beat the human
+      winnerId = CPU_PLAYER_ID; // The system beat the human
     } else if (game.totalMoves + 1 >= GAME.BOARD_COLS * GAME.BOARD_ROWS) {
       newStatus = "DRAW" as any;
     }
@@ -501,7 +502,7 @@ async function triggerCpuMove(gameId: string, io: any) {
     // 4. Broadcast the CPU's move to the frontend
     if (io) {
       io.to(gameId).emit("move_made", {
-        playerId: "CPU",
+        playerId: CPU_PLAYER_ID,
         column: cpuCol,
         row: cpuRow,
         board,

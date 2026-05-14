@@ -27,7 +27,7 @@ const app: Application = express();
 const PORT = process.env.PORT || 5000;
 
 // start-stale-game-cleanup
-// initCleanupJob();
+initCleanupJob();
 
 // create a http server and pass it to socket.io
 const server = http.createServer(app);
@@ -35,7 +35,8 @@ const server = http.createServer(app);
 // Initialize Socket.IO by passing the http server instance
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "*",
+    origin: process.env.FRONT_END_URL || "*",
+    credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE"],
   },
 });
@@ -53,12 +54,13 @@ app.use((req, res, next) => {
 
 app.use(
   cors({
-    origin: process.env.FRONT_END_URL || "https://connect-four-gane.vercel.app",
+    origin: process.env.FRONT_END_URL || "https://connect-four-game.vercel.app",
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   }),
 );
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
 
 // Load and serve Swagger UI documentation
@@ -94,6 +96,28 @@ app.use("/api/v1/game", gameRoutes);
 app.use(notFoundHandler);
 app.use(globalErrorHandler);
 
-server.listen(PORT, () => {
+// Abandon any IN_PROGRESS games whose timers/sockets died with the previous process
+const sweepStaleGames = async () => {
+  try {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const result = await prisma.game.updateMany({
+      where: {
+        status: "IN_PROGRESS",
+        lastActiveAt: { lt: fiveMinutesAgo },
+      },
+      data: { status: "ABANDONED" },
+    });
+    if (result.count > 0) {
+      console.log(
+        `Swept ${result.count} stale IN_PROGRESS game(s) to ABANDONED`,
+      );
+    }
+  } catch (error) {
+    console.error("Failed to sweep stale games on boot:", error);
+  }
+};
+
+server.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
+  await sweepStaleGames();
 });

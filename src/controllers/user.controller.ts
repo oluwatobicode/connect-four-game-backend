@@ -5,7 +5,11 @@ import { sendSuccess, sendError } from "../interfaces/ApiResponse.js";
 
 // get current logged in user profile
 // get current logged in user profile
-export const getProfile = async (req: Request, res: Response, next: NextFunction) => {
+export const getProfile = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const userId = req.user as string;
     const user = await prisma.user.findUnique({
@@ -21,15 +25,20 @@ export const getProfile = async (req: Request, res: Response, next: NextFunction
           select: {
             gamesAsPlayer1: true,
             gamesAsPlayer2: true,
-            achievements: true
-          }
-        }
-      }
+            achievements: true,
+          },
+        },
+      },
     });
 
     if (!user) return sendError(res, STATUS_CODE.NOT_FOUND, "User not found");
 
-    return sendSuccess(res, STATUS_CODE.Ok, "Profile fetched successfully", user);
+    return sendSuccess(
+      res,
+      STATUS_CODE.Ok,
+      "Profile fetched successfully",
+      user,
+    );
   } catch (error) {
     console.log(error);
     next(error);
@@ -45,20 +54,65 @@ export const updateProfile = async (
 ) => {
   try {
     const userId = req.user as string;
-    const { username, avatar } = req.body;
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : null;
+
+    if (!body) {
+      return sendError(
+        res,
+        STATUS_CODE.BAD_REQUEST,
+        "Request body is required",
+      );
+    }
+
+    const username =
+      typeof body.username === "string" ? body.username.trim() : undefined;
+    const avatar =
+      body.avatar === null
+        ? null
+        : typeof body.avatar === "string"
+          ? body.avatar.trim()
+          : undefined;
+
+    if (body.username !== undefined && !username) {
+      return sendError(
+        res,
+        STATUS_CODE.BAD_REQUEST,
+        ERROR_MESSAGES.REQUIRED_FIELD("username"),
+      );
+    }
+
+    const hasUsernameUpdate = typeof username === "string";
+    const hasAvatarUpdate = body.avatar === null || typeof avatar === "string";
+
+    if (!hasUsernameUpdate && !hasAvatarUpdate) {
+      return sendError(
+        res,
+        STATUS_CODE.BAD_REQUEST,
+        "Provide a username or avatar to update",
+      );
+    }
 
     if (username) {
-      const existingUser = await prisma.user.findUnique({ where: { username } });
+      const existingUser = await prisma.user.findUnique({
+        where: { username },
+      });
       if (existingUser && existingUser.id !== userId) {
-        return sendError(res, STATUS_CODE.CONFLICT, "Username is already taken");
+        return sendError(
+          res,
+          STATUS_CODE.CONFLICT,
+          "Username is already taken",
+        );
       }
     }
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
-        ...(username && { username }),
-        ...(avatar && { avatar }),
+        ...(hasUsernameUpdate && { username }),
+        ...(hasAvatarUpdate && { avatar }),
       },
       select: {
         id: true,
@@ -66,17 +120,21 @@ export const updateProfile = async (
         username: true,
         avatar: true,
         eloRating: true,
-      }
+      },
     });
 
-    return sendSuccess(res, STATUS_CODE.Ok, "Profile updated successfully", updatedUser);
+    return sendSuccess(
+      res,
+      STATUS_CODE.Ok,
+      "Profile updated successfully",
+      updatedUser,
+    );
   } catch (error) {
     console.log(error);
     next(error);
   }
 };
 
-// soft-delete currently logged in user profile
 // soft-delete currently logged in user profile
 export const deleteProfile = async (
   req: Request,
@@ -97,7 +155,7 @@ export const deleteProfile = async (
         email: `deleted_${userId}@anonymized.com`,
         password: null,
         avatar: null,
-      }
+      },
     });
 
     return sendSuccess(res, STATUS_CODE.Ok, "Profile deleted successfully");
@@ -128,15 +186,20 @@ export const getAUserProfile = async (
           select: {
             gamesAsPlayer1: true,
             gamesAsPlayer2: true,
-            achievements: true
-          }
-        }
-      }
+            achievements: true,
+          },
+        },
+      },
     });
 
     if (!user) return sendError(res, STATUS_CODE.NOT_FOUND, "User not found");
 
-    return sendSuccess(res, STATUS_CODE.Ok, "Public profile fetched successfully", user);
+    return sendSuccess(
+      res,
+      STATUS_CODE.Ok,
+      "Public profile fetched successfully",
+      user,
+    );
   } catch (error) {
     console.log(error);
     next(error);
@@ -155,20 +218,22 @@ export const getAUserGameHistory = async (
     const games = await prisma.game.findMany({
       where: {
         status: { in: ["COMPLETED", "DRAW", "ABANDONED", "FORFEITED"] },
-        OR: [
-          { player1Id: userId },
-          { player2Id: userId }
-        ]
+        OR: [{ player1Id: userId }, { player2Id: userId }],
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: 20,
       include: {
         player1: { select: { id: true, username: true, avatar: true } },
         player2: { select: { id: true, username: true, avatar: true } },
-      }
+      },
     });
 
-    return sendSuccess(res, STATUS_CODE.Ok, "Game history fetched successfully", games);
+    return sendSuccess(
+      res,
+      STATUS_CODE.Ok,
+      "Game history fetched successfully",
+      games,
+    );
   } catch (error) {
     console.log(error);
     next(error);

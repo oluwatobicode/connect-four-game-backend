@@ -1,5 +1,5 @@
 import prisma from "../config/prisma.js";
-import { STATUS_CODE } from "../config/constants.config.js";
+import { STATUS_CODE, ERROR_MESSAGES } from "../config/constants.config.js";
 import { sendSuccess, sendError } from "../interfaces/ApiResponse.js";
 // get current logged in user profile
 // get current logged in user profile
@@ -38,7 +38,26 @@ export const getProfile = async (req, res, next) => {
 export const updateProfile = async (req, res, next) => {
     try {
         const userId = req.user;
-        const { username, avatar } = req.body;
+        const body = req.body && typeof req.body === "object"
+            ? req.body
+            : null;
+        if (!body) {
+            return sendError(res, STATUS_CODE.BAD_REQUEST, "Request body is required");
+        }
+        const username = typeof body.username === "string" ? body.username.trim() : undefined;
+        const avatar = body.avatar === null
+            ? null
+            : typeof body.avatar === "string"
+                ? body.avatar.trim()
+                : undefined;
+        if (body.username !== undefined && !username) {
+            return sendError(res, STATUS_CODE.BAD_REQUEST, ERROR_MESSAGES.REQUIRED_FIELD("username"));
+        }
+        const hasUsernameUpdate = typeof username === "string";
+        const hasAvatarUpdate = body.avatar === null || typeof avatar === "string";
+        if (!hasUsernameUpdate && !hasAvatarUpdate) {
+            return sendError(res, STATUS_CODE.BAD_REQUEST, "Provide a username or avatar to update");
+        }
         if (username) {
             const existingUser = await prisma.user.findUnique({ where: { username } });
             if (existingUser && existingUser.id !== userId) {
@@ -48,8 +67,8 @@ export const updateProfile = async (req, res, next) => {
         const updatedUser = await prisma.user.update({
             where: { id: userId },
             data: {
-                ...(username && { username }),
-                ...(avatar && { avatar }),
+                ...(hasUsernameUpdate && { username }),
+                ...(hasAvatarUpdate && { avatar }),
             },
             select: {
                 id: true,

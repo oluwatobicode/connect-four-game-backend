@@ -11,7 +11,12 @@ export const getAllAchievements = (
   next: NextFunction,
 ) => {
   try {
-    return sendSuccess(res, STATUS_CODE.Ok, "Fetched all achievements", ACHIEVEMENTS);
+    return sendSuccess(
+      res,
+      STATUS_CODE.Ok,
+      "Fetched all achievements",
+      ACHIEVEMENTS,
+    );
   } catch (error) {
     console.log(error);
     next(error);
@@ -26,15 +31,15 @@ export const getMyAchievements = async (
 ) => {
   try {
     const userId = req.user as string;
-    
+
     if (!userId) {
-       return sendError(res, STATUS_CODE.UNAUTHORIZED, "Unauthorized");
+      return sendError(res, STATUS_CODE.UNAUTHORIZED, "Unauthorized");
     }
 
     const myAchievements = await prisma.achievement.findMany({
       where: { userId },
       select: { type: true, unlockedAt: true },
-      orderBy: { unlockedAt: 'desc' },
+      orderBy: { unlockedAt: "desc" },
     });
 
     const populated = myAchievements.map((a) => {
@@ -42,7 +47,12 @@ export const getMyAchievements = async (
       return { ...config, unlockedAt: a.unlockedAt };
     });
 
-    return sendSuccess(res, STATUS_CODE.Ok, "Fetched my achievements", populated);
+    return sendSuccess(
+      res,
+      STATUS_CODE.Ok,
+      "Fetched my achievements",
+      populated,
+    );
   } catch (error) {
     console.log(error);
     next(error);
@@ -61,7 +71,7 @@ export const getAUserAchievement = async (
     const userAchievements = await prisma.achievement.findMany({
       where: { userId: userId as string },
       select: { type: true, unlockedAt: true },
-      orderBy: { unlockedAt: 'desc' },
+      orderBy: { unlockedAt: "desc" },
     });
 
     const populated = userAchievements.map((a) => {
@@ -69,7 +79,12 @@ export const getAUserAchievement = async (
       return { ...config, unlockedAt: a.unlockedAt };
     });
 
-    return sendSuccess(res, STATUS_CODE.Ok, "Fetched user achievements", populated);
+    return sendSuccess(
+      res,
+      STATUS_CODE.Ok,
+      "Fetched user achievements",
+      populated,
+    );
   } catch (error) {
     console.log(error);
     next(error);

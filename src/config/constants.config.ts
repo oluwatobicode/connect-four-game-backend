@@ -80,6 +80,8 @@ export const GAME = {
   MINIMAX_DEPTH: { EASY: 1, MEDIUM: 3, HARD: 6, PROFESSIONAL: 7 },
 };
 
+export const CPU_PLAYER_ID = "CPU";
+
 export const ELO = {
   DEFAULT_RATING: 1000,
   K_FACTOR: 32,

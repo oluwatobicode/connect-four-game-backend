@@ -34,13 +34,12 @@ app.use((req, res, next) => {
     next();
 });
 app.use(cors({
-    origin: process.env.CLIENT_URL ||
-        "http://localhost:5173" ||
-        "https://connect-four-gane.vercel.app",
+    origin: process.env.FRONT_END_URL || "https://connect-four-gane.vercel.app",
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
 }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
 // Load and serve Swagger UI documentation
 const swaggerDocument = YAML.load(path.join(process.cwd(), "swagger.yml"));

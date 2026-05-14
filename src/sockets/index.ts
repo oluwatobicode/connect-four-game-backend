@@ -1,72 +1,160 @@
 import { Server, Socket } from "socket.io";
-import { clearDisconnectTimer, startDisconnectTimer } from "../services/timer.service.js";
+import prisma from "../config/prisma.js";
+import {
+  clearDisconnectTimer,
+  startDisconnectTimer,
+} from "../services/timer.service.js";
 
-// Keep track of which game a user is looking at right now
-const activePlayers = new Map<string, string>(); // Maps a userId to a gameId
+// userId -> set of gameIds the user is currently inside
+const activePlayers = new Map<string, Set<string>>();
+const connectedSocketsByUser = new Map<string, Set<string>>();
+
+// socketId -> recent message timestamps (for chat rate limiting)
+const recentMessages = new Map<string, number[]>();
+const CHAT_WINDOW_MS = 10_000;
+const CHAT_MAX_PER_WINDOW = 5;
+const CHAT_MAX_LENGTH = 500;
+
+const debugLog = (...args: unknown[]) => {
+  if (process.env.NODE_ENV !== "production") {
+    console.log(...args);
+  }
+};
+
+const registerSocket = (userId: string, socketId: string) => {
+  const sockets = connectedSocketsByUser.get(userId) ?? new Set<string>();
+  sockets.add(socketId);
+  connectedSocketsByUser.set(userId, sockets);
+};
+
+const unregisterSocket = (userId: string, socketId: string) => {
+  const sockets = connectedSocketsByUser.get(userId);
+  if (!sockets) return true;
+
+  sockets.delete(socketId);
+
+  if (sockets.size === 0) {
+    connectedSocketsByUser.delete(userId);
+    return true;
+  }
+
+  return false;
+};
+
+const addActiveGame = (userId: string, gameId: string) => {
+  const games = activePlayers.get(userId) ?? new Set<string>();
+  games.add(gameId);
+  activePlayers.set(userId, games);
+};
+
+const removeActiveGame = (userId: string, gameId: string) => {
+  const games = activePlayers.get(userId);
+  if (!games) return;
+  games.delete(gameId);
+  if (games.size === 0) activePlayers.delete(userId);
+};
+
+const isParticipant = async (userId: string, gameId: string) => {
+  const game = await prisma.game.findUnique({
+    where: { id: gameId },
+    select: { player1Id: true, player2Id: true },
+  });
+  if (!game) return false;
+  return game.player1Id === userId || game.player2Id === userId;
+};
 
 export const setupSockets = (io: Server) => {
-  // we are listening here
   io.on("connection", (socket: Socket) => {
-    console.log("socket connected", socket.id, "user:", socket.data.userId);
+    const userId = socket.data.userId as string;
+    registerSocket(userId, socket.id);
+
+    debugLog("socket connected", socket.id, "user:", userId);
 
     // Join a personal room for private notifications
-    socket.join(socket.data.userId);
+    socket.join(userId);
 
     socket.on("disconnect", (reason) => {
-      console.log("socket disconnected", socket.id, "reason:", reason);
+      debugLog("socket disconnected", socket.id, "reason:", reason);
+      recentMessages.delete(socket.id);
 
-      // 1. Did they drop while actively inside a game room?
-      const gameId = activePlayers.get(socket.data.userId);
-      activePlayers.delete(socket.data.userId);
+      const hasNoActiveSockets = unregisterSocket(userId, socket.id);
+      if (!hasNoActiveSockets) return;
 
-      if (gameId) {
-        // 2. Start the 30-second Abandonment clock! ⏳
-        startDisconnectTimer(gameId, socket.data.userId, io);
+      // User dropped completely — start disconnect timer for every game they were in
+      const games = activePlayers.get(userId);
+      if (!games) return;
+
+      const gameIds = Array.from(games);
+      activePlayers.delete(userId);
+
+      for (const gameId of gameIds) {
+        startDisconnectTimer(gameId, userId, io);
       }
     });
 
-    // Handle game-specific events here
-    socket.on("join_game", (gameId: string) => {
-      socket.join(gameId);
-      
-      // 1. Remember what room they are looking at in RAM
-      activePlayers.set(socket.data.userId, gameId); 
+    socket.on("join_game", async (gameId: unknown) => {
+      if (typeof gameId !== "string" || !gameId.trim()) return;
+      const normalizedGameId = gameId.trim();
 
-      // 2. THE RESCUE: If they just refreshed their page, this cancels the disconnect timer! 🚀
-      clearDisconnectTimer(gameId, socket.data.userId);
+      const game = await prisma.game.findUnique({
+        where: { id: normalizedGameId },
+        select: { id: true, status: true, player1Id: true, player2Id: true },
+      });
 
-      console.log(`User ${socket.data.userId} joined game room: ${gameId}`);
+      if (!game || game.status !== "IN_PROGRESS") {
+        socket.emit("join_error", { reason: "Game not joinable" });
+        return;
+      }
 
-      // Notify others in the room
-      socket.to(gameId).emit("player_joined", { userId: socket.data.userId });
+      socket.join(normalizedGameId);
+      addActiveGame(userId, normalizedGameId);
+
+      // If they refreshed / reconnected, cancel any pending disconnect timer
+      clearDisconnectTimer(normalizedGameId, userId);
+
+      debugLog(`User ${userId} joined game room: ${normalizedGameId}`);
+      socket.to(normalizedGameId).emit("player_joined", { userId });
     });
 
-    socket.on("leave_game", (gameId: string) => {
-      socket.leave(gameId);
+    socket.on("leave_game", (gameId: unknown) => {
+      if (typeof gameId !== "string" || !gameId.trim()) return;
+      const normalizedGameId = gameId.trim();
 
-      // 1. They clicked a "Back" button or intentionally left 
-      activePlayers.delete(socket.data.userId);
-      clearDisconnectTimer(gameId, socket.data.userId);
+      socket.leave(normalizedGameId);
+      removeActiveGame(userId, normalizedGameId);
+      clearDisconnectTimer(normalizedGameId, userId);
 
-      console.log(`User ${socket.data.userId} left game room: ${gameId}`);
-
-      // Notify others in the room
-      socket.to(gameId).emit("player_left", { userId: socket.data.userId });
+      debugLog(`User ${userId} left game room: ${normalizedGameId}`);
+      socket.to(normalizedGameId).emit("player_left", { userId });
     });
 
-    socket.on("send_message", (data: { message: string; gameId: string }) => {
+    socket.on("send_message", async (data: { message: string; gameId: string }) => {
+      if (!data || typeof data !== "object") return;
       const { gameId, message } = data;
+      if (typeof gameId !== "string" || typeof message !== "string") return;
 
-      if (typeof message !== "string" || typeof gameId !== "string") return;
-      if (!message.trim()) return;
+      const trimmed = message.trim();
+      if (!trimmed || trimmed.length > CHAT_MAX_LENGTH) return;
+
+      // Rate limit: max N messages per window per socket
+      const now = Date.now();
+      const recent = (recentMessages.get(socket.id) ?? []).filter(
+        (t) => now - t < CHAT_WINDOW_MS,
+      );
+      if (recent.length >= CHAT_MAX_PER_WINDOW) return;
+      recent.push(now);
+      recentMessages.set(socket.id, recent);
+
+      // Only participants of the game can chat in its room
+      if (!(await isParticipant(userId, gameId))) return;
 
       io.to(gameId).emit("receive_message", {
-        userId: socket.data.userId,
-        message: message.trim(),
+        userId,
+        message: trimmed,
         timeStamp: new Date(),
       });
 
-      console.log(`[Chat] Message in ${gameId} from ${socket.data.userId}`);
+      debugLog(`[Chat] Message in ${gameId} from ${userId}`);
     });
   });
 };

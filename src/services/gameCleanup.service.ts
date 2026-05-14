@@ -58,8 +58,7 @@ export const initCleanupJob = () => {
     "[CleanupService] Stale game cleanup job scheduled (every 30 mins).",
   );
 
-  // Delay first cleanup to allow DB connection to wake up
   setTimeout(() => {
     cleanupStaleGames();
-  }, 5000); // wait 5 seconds
+  }, 5000);
 };
