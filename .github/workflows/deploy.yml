@@ -1,4 +1,4 @@
-name: Deploy Connect Four
+name: Deploy Connect Four Deployment
 
 on:
   push:
