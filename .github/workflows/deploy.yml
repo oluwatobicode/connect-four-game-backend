@@ -10,43 +10,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Debug secrets and connectivity
-        env:
-          HOST: ${{ secrets.EC2_HOST }}
-          USERNAME: ${{ secrets.EC2_USERNAME }}
-          PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
-        run: |
-          echo "=== Secret presence checks ==="
-          if [ -z "$HOST" ]; then echo "HOST is EMPTY"; else echo "HOST is set"; fi
-          if [ -z "$USERNAME" ]; then echo "USERNAME is EMPTY"; else echo "USERNAME is set"; fi
-          if [ -z "$PRIVATE_KEY" ]; then echo "PRIVATE_KEY is EMPTY"; else echo "PRIVATE_KEY is set"; fi
-
-          echo ""
-          echo "=== Length checks ==="
-          echo "Host length: ${#HOST}"
-          echo "Username length: ${#USERNAME}"
-          echo "Private key length: ${#PRIVATE_KEY}"
-
-          echo ""
-          echo "=== Trailing/leading character checks (looking for stray \\n, \\r, spaces) ==="
-          echo "Host first char code: $(printf '%d' "'${HOST:0:1}")"
-          echo "Host last char code: $(printf '%d' "'${HOST: -1}")"
-          echo "Username first char code: $(printf '%d' "'${USERNAME:0:1}")"
-          echo "Username last char code: $(printf '%d' "'${USERNAME: -1}")"
-          echo "(Reference: 48-57 = digits, 65-90 = A-Z, 97-122 = a-z, 10 = LF, 13 = CR, 32 = space)"
-
-          echo ""
-          echo "=== DNS resolution ==="
-          getent hosts "$HOST" || echo "DNS resolution failed (fine if HOST is a raw IP)"
-
-          echo ""
-          echo "=== TCP connectivity to port 22 ==="
-          nc -vz -w 10 "$HOST" 22 || echo "nc failed with exit code $?"
-
-          echo ""
-          echo "=== Runner's public IP (for SG whitelist debugging) ==="
-          curl -s https://api.ipify.org && echo ""
-
       - name: Deploy to EC2
         env:
           PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
@@ -55,7 +18,7 @@ jobs:
         run: |
           echo "$PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
-          ssh -v -o StrictHostKeyChecking=no -o ConnectTimeout=15 -i private_key.pem $USERNAME@$HOST << 'EOF'
+          ssh -o StrictHostKeyChecking=no -i private_key.pem $USERNAME@$HOST << 'EOF'
             cd ~/connect-four-game-backend
             git fetch origin main
             git reset --hard origin/main
